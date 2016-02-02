@@ -3,7 +3,7 @@
 
 # See architecture.md
 
-import theano as Th
+import theano
 import theano.tensor as T
 import numpy as np
 
@@ -15,12 +15,12 @@ CHARS = [
     '9',' '
 ]
 
-INPUT_SIZE = 441  # Frames / input
+INPUT_SIZE = 20  # Frames / input
 N_CLASSES  = len(CHARS)
 
 def lstm_layer(size):
-    c  = Th.shared(np.random.randn(size), 'c') # State
-    h  = Th.shared(np.random.randn(size), 'h') # Output to next layer
+    c  = theano.shared(np.random.randn(size), 'c') # State
+    h  = theano.shared(np.random.randn(size), 'h') # Output to next layer
 
     # Affine transform weights biases
     wf = np.random.randn(size, size * 2)
@@ -41,7 +41,7 @@ def lstm_layer(size):
     c_ = T.tanh(T.dot(wc, xh) + bc)
     o = T.nnet.sigmoid(T.dot(wo, xh) + bo)
 
-    return Th.function([x], [h, c], updates=[(c, f * c + i * c_), (h, o * T.tanh(c))])
+    return theano.function([x], [h, c], updates=[(c, f * c + i * c_), (h, o * T.tanh(c))])
 
 def rlu_layer():
     pass
@@ -49,8 +49,9 @@ def rlu_layer():
 def softmax_layer():
     pass
 
-lstm = lstm_layer(6)
+lstm = lstm_layer(INPUT_SIZE)
 
-for i in xrange(10):
-    print lstm([1,2,3,4,5,6])
-
+print "Calculating"
+for i in xrange(1000):
+    lstm([1]*INPUT_SIZE)
+print "Done"
