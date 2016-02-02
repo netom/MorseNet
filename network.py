@@ -15,7 +15,7 @@ CHARS = [
     '9',' '
 ]
 
-INPUT_SIZE = 20  # Frames / input
+INPUT_SIZE = 441  # Frames / input
 N_CLASSES  = len(CHARS)
 
 def lstm_layer(size):
@@ -52,6 +52,7 @@ def softmax_layer():
 lstm = lstm_layer(INPUT_SIZE)
 
 print "Calculating"
-for i in xrange(1000):
+for i in xrange(10000):
     lstm([1]*INPUT_SIZE)
 print "Done"
+
