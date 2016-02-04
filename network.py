@@ -5,6 +5,7 @@
 
 import theano
 import theano.tensor as T
+#import theano.sandbox.cuda.basic_ops
 import numpy as np
 
 # Output layer: EPSILON, A-Z, 0-9, ' ': 37
