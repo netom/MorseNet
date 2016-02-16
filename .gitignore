@@ -1,1 +1,4 @@
 training_set
+*.pkl
+*.pyc
+
