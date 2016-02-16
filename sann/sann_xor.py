@@ -62,10 +62,10 @@ class Net:
         for i in xrange(len(self.params)):
             self.params[i] = np.random.randn(*self.params[i].shape).astype(np.float32)
 
-    def neighbour(self, distance=1000.0):
+    def neighbour(self, learning_rate):
         nn = Net()
         for i in xrange(len(self.params)):
-            nn.params[i] = (self.params[i] + (np.random.randn(*self.params[i].shape) - 0.5) / distance).astype(np.float32)
+            nn.params[i] = (self.params[i] + (np.random.randn(*self.params[i].shape) - 0.5) * learning_rate).astype(np.float32)
         return nn
 
     def mse(self, examples, targets):
@@ -94,7 +94,7 @@ n.randomize()
 e = n.mse(examples, targets)
 c = 0
 while e > 10**(-10) and c < 10**5:
-    nn   = n.neighbour(min(1 / e, 10000)) # Learning rate dependent on the energy
+    nn   = n.neighbour(max(e, 0.0001)) # Learning rate dependent on the energy
     enew = nn.mse(examples, targets)
 
     if trans_prob(enew, e) > random.random():
