@@ -6,6 +6,7 @@ import theano
 import theano.tensor as T
 import random
 import numpy as np
+import matplotlib.pyplot as plt
 
 #    Let s = s0
 #    For k = 0 through kmax (exclusive):
@@ -74,6 +75,8 @@ class Net:
 def trans_prob(enew, e):
     return 1.0 if enew < e else 0
 
+plt.ion()
+
 examples = np.array([
     [0.0, 0.0],
     [0.0, 1.0],
@@ -93,6 +96,9 @@ n.randomize()
 
 e = n.mse(examples, targets)
 c = 0
+data = []
+fig = plt.figure()
+ax = fig.add_subplot(1, 1, 1)
 while e > 10**(-10) and c < 10**5:
     nn   = n.neighbour(max(e, 0.0001)) # Learning rate dependent on the energy
     enew = nn.mse(examples, targets)
@@ -101,14 +107,18 @@ while e > 10**(-10) and c < 10**5:
         e = enew
         n = nn
 
-    if c % 1000 == 0: print e
+    if c % 1000 == 0:
+        data.append(e)
+        ax.clear()
+        ax.set_yscale('log')
+        ax.plot(data)
+        plt.draw()
 
     c += 1
 
-print
-print
 print c
 print
-print n.params
-print
 print n.propagate(examples)
+
+plt.ion()
+plt.show()
