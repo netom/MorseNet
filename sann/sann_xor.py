@@ -120,5 +120,4 @@ print c
 print
 print n.propagate(examples)
 
-plt.ion()
-plt.show()
+plt.show(True)
