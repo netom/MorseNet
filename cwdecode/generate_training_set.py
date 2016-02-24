@@ -1,54 +1,12 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
-# The problem is a transcription problem
-
 import wave
 import numpy as np
 import scipy.signal as sig
 import random
 
-SETSIZE = 10000
-TRAINING_SET_DIR = 'training_set'
-CHARS = {
-    'A': '.-',
-    'B': '-...',
-    'C': '-.-.',
-    'D': '-...',
-    'E': '.',
-    'F': '..-.',
-    'G': '--.',
-    'H': '....',
-    'I': '..',
-    'J': '.---',
-    'K': '-.-',
-    'L': '.-..',
-    'M': '--',
-    'N': '-.',
-    'O': '---',
-    'P': '.--.',
-    'Q': '--.-',
-    'R': '.-.',
-    'S': '...',
-    'T': '-',
-    'U': '..-',
-    'V': '...-',
-    'W': '.--',
-    'X': '-..-',
-    'Y': '-.--',
-    'Z': '--..',
-    '0': '-----',
-    '1': '.----',
-    '2': '..---',
-    '3': '...--',
-    '4': '....-',
-    '5': '.....',
-    '6': '-....',
-    '7': '--...',
-    '8': '---..',
-    '9': '----.',
-    ' ': None
-}
+from config import *
 
 def random_text_length_min():
     return 5
@@ -56,13 +14,10 @@ def random_text_length_min():
 def random_text_length_max():
     return 100
 
-def framerate():
-    return 44100.0
-
 def wpm2dit(wpm):
     return 1.2 / wpm
 
-# Deviation is normalized
+# Deviation is in percent of dit length
 def dit_len(wpm, deviation):
     dl = wpm2dit(wpm)
     return random.normalvariate(dl, dl * deviation) # dit length
@@ -92,7 +47,7 @@ def impulsenoise(frames, th):
     return ret
 
 def qsb(frames, vol, f):
-    return 1.0 - np.sin(np.linspace(0, 2 * np.pi * frames / framerate() * f, frames)) * vol
+    return 1.0 - np.sin(np.linspace(0, 2 * np.pi * frames / FRAMERATE * f, frames)) * vol
 
 def txt2morse(txt):
     wpm       = random.uniform(5.0, 50)
@@ -124,18 +79,18 @@ def txt2morse(txt):
         timed_txt += '%s,%f\n' % (c, soundl)
     
     # Generate the sound for it (with padding at the end)
-    seq = np.zeros((soundl + min(0, random.normalvariate(3, 0.2))) * framerate(), dtype=np.float64)
+    seq = np.zeros((soundl + min(0, random.normalvariate(3, 0.2))) * FRAMERATE, dtype=np.float64)
 
-    i = padh * framerate()
+    i = padh * FRAMERATE
     for e in el:
-        l = int(e[1] * framerate())
+        l = int(e[1] * FRAMERATE)
         seq[i:(i+l)] = e[0]
         i += l
 
     return (
         (
             seq # On-off sequence
-            * np.sin(np.arange(0, len(seq)) * (random.randint(400, 800) * 2 * np.pi / framerate())) # Baseband signal
+            * np.sin(np.arange(0, len(seq)) * (random.randint(400, 800) * 2 * np.pi / FRAMERATE)) # Baseband signal
             * qsb(len(seq), qsbvol, qsbf)
             + whitenoise(len(seq), wnvol)
             + impulsenoise(len(seq), 4.2)
@@ -150,7 +105,6 @@ def random_text():
     return ''.join(random.choice(CHARS.keys()) for _ in xrange(l))
 
 def generate_random_sample(i):
-    #samplename = ''.join(random.choice(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f']) for _ in xrange(20))
     samplename = 'sample_' + str(i)
     txt = random_text()
     # TODO: timed training output
@@ -162,7 +116,7 @@ def generate_random_sample(i):
     w = wave.open(TRAINING_SET_DIR + '/' + samplename + '.wav', 'wb')
     w.setnchannels(1)
     w.setsampwidth(2)
-    w.setframerate(int(framerate()))
+    w.setframerate(int(FRAMERATE))
     w.writeframes(data)
 
 for i in xrange(SETSIZE):
