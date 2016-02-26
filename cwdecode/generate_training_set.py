@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
-import wave
+# TODO: dont's repeat spaces in target, do repeat in voice
+
 import numpy as np
 import scipy.signal as sig
 import random
+import cPickle
 
 from config import *
 
@@ -56,7 +58,7 @@ def txt2morse(txt):
     qsbvol    = random.uniform(0.0, 0.95)
     qsbf      = random.uniform(0.1, 1.0)
 
-    timed_txt = ''
+    timed_chars = []
 
     # Build the event list
     padh = max(0, random.normalvariate(3, 0.2)) # Padding at the beginning
@@ -76,10 +78,12 @@ def txt2morse(txt):
             el = el[:-1]        #
             el.append((0.0, chrspace_len(wpm, deviation)))
             soundl += el[-1][1]
-        timed_txt += '%s,%f\n' % (c, soundl)
+        timed_chars.append((c, soundl))
     
     # Generate the sound for it (with padding at the end)
-    seq = np.zeros((soundl + min(0, random.normalvariate(3, 0.2))) * FRAMERATE, dtype=np.float64)
+    seql = (soundl + min(0, random.normalvariate(3, 0.2))) * FRAMERATE
+    seql += CHUNK - seql % CHUNK # So seql % CHUNK == 0
+    seq = np.zeros(seql, dtype=np.float64)
 
     i = padh * FRAMERATE
     for e in el:
@@ -87,37 +91,55 @@ def txt2morse(txt):
         seq[i:(i+l)] = e[0]
         i += l
 
-    return (
+    return np.reshape(
         (
             seq # On-off sequence
             * np.sin(np.arange(0, len(seq)) * (random.randint(400, 800) * 2 * np.pi / FRAMERATE)) # Baseband signal
             * qsb(len(seq), qsbvol, qsbf)
             + whitenoise(len(seq), wnvol)
             + impulsenoise(len(seq), 4.2)
-        ) * (2 ** 13)
-    ).astype(np.int16), timed_txt
+        ) * 0.25, # Volume
+        (seql / CHUNK, CHUNK)
+    ).astype(np.float32), timed_chars
     # TODO: filter for clicks (random filter?)
     # TODO: QRM
 
 def random_text():
     ret = ''
-    l = random.randint(5, 100)
-    return ''.join(random.choice(CHARS.keys()) for _ in xrange(l))
+    l = random.randint(20, 50)
+    return ''.join(random.choice(MORSE_CHR[1:] + [' '] * 4) for _ in xrange(l))
 
 def generate_random_sample(i):
     samplename = 'sample_' + str(i)
     txt = random_text()
-    # TODO: timed training output
-    data, timed_txt = txt2morse(txt)
 
-    with open(TRAINING_SET_DIR + '/' + samplename + '.txt', 'w') as f:
-        f.write(timed_txt)
+    # Generate training target and RNN input
+    chunks, timed_chars = txt2morse(txt)
 
-    w = wave.open(TRAINING_SET_DIR + '/' + samplename + '.wav', 'wb')
-    w.setnchannels(1)
-    w.setsampwidth(2)
-    w.setframerate(int(FRAMERATE))
-    w.writeframes(data)
+    # Loop through de wave data and take CHUNK samples at a time.
+    # Advance a time counter. If the time just have past a character,
+    # put that character into the training target and remove from the list.
+    # Put the lists into a tuple and pickle the whole thing
+
+    # TODO: could we just reshape the voice data?
+    chars = []
+    t = 0
+    for i in xrange(len(chunks)):
+        t += CHUNK_T
+
+        if timed_chars[0][1] <= t:
+            char = MORSE_ORD[timed_chars[0][0]]
+            timed_chars = timed_chars[1:]
+        else:
+            char = 0
+
+        chars.append(char)
+
+        if len(timed_chars) <= 0:
+            break;
+
+    with open(TRAINING_SET_DIR + '/' + samplename + '.pickle', 'w') as f:
+        cPickle.dump((chunks, chars), f)
 
 for i in xrange(SETSIZE):
     print i

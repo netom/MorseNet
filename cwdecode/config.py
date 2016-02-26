@@ -1,10 +1,18 @@
-SETSIZE = 5
+DEVICE = 0
+SETSIZE = 100
 TRAINING_SET_DIR = 'training_set'
+
+MORSE_CHR = ['\0','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','0','1','2','3','4','5','6','7','8','9', ' ']
+
+MORSE_ORD = {}
+for i in xrange(len(MORSE_CHR)):
+    MORSE_ORD[MORSE_CHR[i]] = i
+
 CHARS = {
     'A': '.-',
     'B': '-...',
     'C': '-.-.',
-    'D': '-...',
+    'D': '-..',
     'E': '.',
     'F': '..-.',
     'G': '--.',
@@ -39,6 +47,7 @@ CHARS = {
     '9': '----.',
     ' ': None
 }
-FRAMERATE = 44100.0
-CHUNK = 200.0
-CHUNK_S = FRAMERATE / CHUNK
+
+FRAMERATE = 44100
+CHUNK = 200
+CHUNK_T = float(CHUNK) / float(FRAMERATE)
