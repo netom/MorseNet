@@ -28,20 +28,28 @@ class RNN:
         w3  = T.fmatrix('w3')
         b3  = T.fvector('b3')
 
-        o2_ = theano.shared(np.zeros(CHUNK, dtype=np.float32), 'o2')
+        o1, _ = theano.scan(
+            fn=lambda x, w1, b1: T.switch(T.dot(x, w1) + b1 < 0, 0, T.dot(x, w1) + b1),
+            sequences=[x],
+            non_sequences=[w1, b1]
+        )
 
-        o1 = T.switch(T.dot(x, w1) + b1 < 0, 0, T.dot(x, w1) + b1)
+        o2, _ = theano.scan(
+            fn=lambda o2_, o1, w2, b2: T.switch(T.dot(T.concatenate([o1, o2_]), w2) + b2 < 0, 0, T.dot(T.concatenate([o1, o2_]), w2) + b2),
+            outputs_info=T.zeros_like(b2),
+            sequences=[o1],
+            non_sequences=[w2, b2]
+        )
 
-        o2 = T.switch(T.dot(T.concatenate([o1, o2_]), w2) + b2 < 0, 0, T.dot(T.concatenate([o1, o2_]), w2) + b2)
-
-        o3 = T.nnet.softmax(T.dot(o2, w3) + b3)[0]
+        o3, _ = theano.scan(
+            fn=lambda o2, w3, b3: T.nnet.softmax(T.dot(o2, w3) + b3)[0],
+            sequences=[o2],
+            non_sequences=[w3, b3]
+        )
 
         self.f = theano.function(
             inputs=[x, w1, b1, w2, b2, w3, b3],
-            outputs=o3,
-            updates=[
-                (o2_, o2)
-            ]
+            outputs=o3
         )
 
         self.params = [
@@ -54,10 +62,7 @@ class RNN:
         ]
 
     def propagate(self, chunks):
-        predictions = []
-        for chunk in chunks:
-            predictions.append(self.f(*([chunk] + self.params)))
-        return predictions
+        return self.f(*([chunks] + self.params))
 
     def neighbour_params(self, learning_rate):
         params = []
@@ -82,6 +87,7 @@ with open('training_set/sample_0.pickle', 'r') as f:
     chunks, targets = cPickle.load(f)
 
 i = 0
+
 (loss, errchrs) = rnn.loss(chunks, targets)
 while True:
     newparams  = rnn.neighbour_params(0.01 / (1 + i / 100))
