@@ -121,7 +121,6 @@ def generate_random_sample(i):
     # put that character into the training target and remove from the list.
     # Put the lists into a tuple and pickle the whole thing
 
-    # TODO: could we just reshape the voice data?
     chars = []
     t = 0
     for i in xrange(len(chunks)):
