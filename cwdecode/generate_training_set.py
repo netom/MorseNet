@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
-# TODO: dont's repeat spaces in target, do repeat in voice
-
+import re
 import numpy as np
 import scipy.signal as sig
 import random
@@ -105,9 +104,9 @@ def txt2morse(txt):
     # TODO: QRM
 
 def random_text():
-    ret = ''
-    l = random.randint(20, 50)
-    return ''.join(random.choice(MORSE_CHR[1:] + [' '] * 4) for _ in xrange(l))
+    l = random.randint(30, 40)
+    ret = ''.join(random.choice(MORSE_CHR[1:] + [' '] * 6) for _ in xrange(l))
+    return re.sub(r'( +)', r' ', ret)
 
 def generate_random_sample(i):
     samplename = 'sample_' + str(i)
@@ -115,6 +114,7 @@ def generate_random_sample(i):
 
     # Generate training target and RNN input
     chunks, timed_chars = txt2morse(txt)
+    print ''.join(map(lambda x: x[0], timed_chars))
 
     # Loop through de wave data and take CHUNK samples at a time.
     # Advance a time counter. If the time just have past a character,
