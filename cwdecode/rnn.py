@@ -21,11 +21,11 @@ class RNN:
 
     def __init__(self, chunks, trgs):
         x  = theano.shared(chunks, 'x')
-        w1 = theano.shared((np.random.randn(CHUNK, CHUNK) * 0.001).astype(np.float32), 'w1')
+        w1 = theano.shared((np.random.randn(CHUNK, CHUNK) * 0.01).astype(np.float32), 'w1')
         b1 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b1')
-        w2 = theano.shared((np.random.randn(CHUNK * 2, CHUNK) * 0.001).astype(np.float32), 'w2')
+        w2 = theano.shared((np.random.randn(CHUNK * 2, CHUNK) * 0.01).astype(np.float32), 'w2')
         b2 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b2')
-        w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.001).astype(np.float32), 'w3')
+        w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.01).astype(np.float32), 'w3')
         b3 = theano.shared((np.random.randn(N_CLASSES) * 0.001).astype(np.float32), 'b3')
         lr = T.fscalar('lr')
         targets = theano.shared(trgs, 'targets')
@@ -103,6 +103,6 @@ rnn = RNN(chunks.astype(np.float32), np.array(targets))
 
 i = 0
 while True:
-    loss, errchrs = rnn.improve(0.001)
+    loss, errchrs = rnn.improve(0.001 / (1 + i / 100))
     i += 1
     print i, errchrs, loss, np.sum(rnn.params[0].get_value()**2), np.sum(rnn.params[2].get_value()**2), np.sum(rnn.params[4].get_value()**2)
