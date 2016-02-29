@@ -19,89 +19,90 @@ N_CLASSES  = len(MORSE_CHR)
 # 3rd layer: softmax classifier (N_CLASSES, N_CLASSES)
 class RNN:
 
-    def __init__(self):
-        x   = T.fmatrix('x') # Input vectors
-        w1  = T.fmatrix('w1')
-        b1  = T.fvector('b1')
-        w2  = T.fmatrix('w2')
-        b2  = T.fvector('b2')
-        w3  = T.fmatrix('w3')
-        b3  = T.fvector('b3')
+    def __init__(self, chunks, trgs):
+        x  = theano.shared(chunks, 'x')
+        w1 = theano.shared((np.random.randn(CHUNK, CHUNK) * 0.001).astype(np.float32), 'w1')
+        b1 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b1')
+        w2 = theano.shared((np.random.randn(CHUNK * 2, CHUNK) * 0.001).astype(np.float32), 'w2')
+        b2 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b2')
+        w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.001).astype(np.float32), 'w3')
+        b3 = theano.shared((np.random.randn(N_CLASSES) * 0.001).astype(np.float32), 'b3')
+        lr = T.fscalar('lr')
+        targets = theano.shared(trgs, 'targets')
 
-        o1, _ = theano.scan(
-            fn=lambda x, w1, b1: T.switch(T.dot(x, w1) + b1 < 0, 0, T.dot(x, w1) + b1),
-            sequences=[x],
-            non_sequences=[w1, b1]
-        )
+        l1 = T.dot(x, w1) + b1
+        o1 = T.switch(T.lt(l1, 0), 0, l1)
 
         o2, _ = theano.scan(
-            fn=lambda o2_, o1, w2, b2: T.switch(T.dot(T.concatenate([o1, o2_]), w2) + b2 < 0, 0, T.dot(T.concatenate([o1, o2_]), w2) + b2),
+            fn=lambda o1, o2_: T.switch(T.dot(T.concatenate([o1, o2_]), w2) + b2 < 0, 0, T.dot(T.concatenate([o1, o2_]), w2) + b2),
             outputs_info=T.zeros_like(b2),
-            sequences=[o1],
-            non_sequences=[w2, b2]
+            sequences=[o1]
         )
 
-        o3, _ = theano.scan(
-            fn=lambda o2, w3, b3: T.nnet.softmax(T.dot(o2, w3) + b3)[0],
-            sequences=[o2],
-            non_sequences=[w3, b3]
-        )
+        o3 = T.nnet.softmax(T.dot(o2, w3) + b3)
 
         self.f = theano.function(
-            inputs=[x, w1, b1, w2, b2, w3, b3],
+            inputs=[],
             outputs=o3
         )
 
-        self.params = [
-            np.random.randn(CHUNK, CHUNK).astype(np.float32) * 0.001,     # w1
-            np.random.randn(CHUNK).astype(np.float32) * 0.001,            # b1
-            np.random.randn(CHUNK * 2, CHUNK).astype(np.float32) * 0.001, # w2
-            np.random.randn(CHUNK).astype(np.float32) * 0.001,            # b2
-            np.random.randn(CHUNK, N_CLASSES).astype(np.float32) * 0.001, # w3
-            np.random.randn(N_CLASSES).astype(np.float32) * 0.001         # b3
-        ]
+        loss = T.sum(- T.log(o3[T.arange(targets.shape[0]), targets])) # TODO: it really does this? :D
 
-    def propagate(self, chunks):
-        return self.f(*([chunks] + self.params))
+        errchrs = T.sum(T.switch(T.eq(T.argmax(o3, axis=1), targets), 0, 1))
+
+        #norml2reg = 10 * (T.sum(w1**2) + T.sum(w2**2) + T.sum(w3**2))
+
+        self.lossf = theano.function(
+            inputs=[],
+            outputs=(loss, errchrs)
+        )
+
+        self.params = [w1, b1, w2, b2, w3, b3]
+
+        self.improvef = theano.function(
+            inputs=[lr],
+            outputs=(loss, errchrs),
+            updates=[
+                (w1, w1 - lr * T.grad(loss, w1)),
+                (b1, b1 - lr * T.grad(loss, b1)),
+                (w2, w2 - lr * T.grad(loss, w2)),
+                (b2, b2 - lr * T.grad(loss, b2)),
+                (w3, w3 - lr * T.grad(loss, w3)),
+                (b3, b3 - lr * T.grad(loss, b3))
+            ],
+            allow_input_downcast=True
+        )
+
+    def propagate(self):
+        return self.f()
+
+    def loss(self):
+        return self.lossf()
+
+    def get_params(self):
+        return map(lambda x: x.get_value(), self.params)
+
+    def set_params(self, params):
+        for i in xrange(len(params)):
+            self.params[i].set_value(params[i])
 
     def neighbour_params(self, learning_rate):
         params = []
-        for i in xrange(len(self.params)):
-            params.append(self.params[i] + np.random.randn(*self.params[i].shape).astype(np.float32) * learning_rate)
+        for param in self.get_params():
+            params.append(param + np.random.randn(*param.shape).astype(np.float32) * learning_rate)
         return params
 
-    def loss(self, chunks, targets):
-        predictions = self.propagate(chunks)
-        loss = 0
-        errchrs = 0
-        for p, t in zip(predictions, targets):
-            loss += - np.log(p[t])
-            if np.argmax(p) != t:
-                errchrs += 1
-        return (loss, errchrs)
-        
+    def improve(self, learning_rate):
+        return self.improvef(learning_rate)
 
-rnn = RNN()
 
 with open('training_set/sample_0.pickle', 'r') as f:
     chunks, targets = cPickle.load(f)
 
+rnn = RNN(chunks.astype(np.float32), np.array(targets))
+
 i = 0
-
-(loss, errchrs) = rnn.loss(chunks, targets)
 while True:
-    newparams  = rnn.neighbour_params(0.01 / (1 + i / 100))
-    oldparams  = rnn.params
-    rnn.params = newparams
-
-    (newloss, newerrchrs) = rnn.loss(chunks, targets)
-
-    if loss <= newloss:
-        rnn.params = oldparams
-    else:
-        loss = newloss
-        errchrs = newerrchrs
-
+    loss, errchrs = rnn.improve(0.001)
     i += 1
-
-    print i, errchrs, loss
+    print i, errchrs, loss, np.sum(rnn.params[0].get_value()**2), np.sum(rnn.params[2].get_value()**2), np.sum(rnn.params[4].get_value()**2)
