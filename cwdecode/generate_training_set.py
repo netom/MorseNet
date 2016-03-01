@@ -104,7 +104,7 @@ def txt2morse(txt):
     # TODO: QRM
 
 def random_text():
-    l = random.randint(30, 40)
+    l = random.randint(5, 10)
     ret = ''.join(random.choice(MORSE_CHR[1:] + [' '] * 6) for _ in xrange(l))
     return re.sub(r'( +)', r' ', ret)
 

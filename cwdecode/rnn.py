@@ -27,7 +27,7 @@ class RNN:
         b2 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b2')
         w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.01).astype(np.float32), 'w3')
         b3 = theano.shared((np.random.randn(N_CLASSES) * 0.001).astype(np.float32), 'b3')
-        lr = theano.shared(np.float32(0.0001))
+        lr = theano.shared(np.float32(0.001))
         targets = theano.shared(trgs, 'targets')
 
         l1 = T.dot(x, w1) + b1
@@ -98,7 +98,7 @@ class RNN:
         return self.improvef()
 
 
-with open('training_set/sample_0.pickle', 'r') as f:
+with open('training_set/sample_1.pickle', 'r') as f:
     chunks, targets = cPickle.load(f)
 
 rnn = RNN(chunks.astype(np.float32), np.array(targets))
