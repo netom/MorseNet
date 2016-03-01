@@ -27,7 +27,7 @@ class RNN:
         b2 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b2')
         w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.01).astype(np.float32), 'w3')
         b3 = theano.shared((np.random.randn(N_CLASSES) * 0.001).astype(np.float32), 'b3')
-        lr = T.fscalar('lr')
+        lr = theano.shared(np.float32(0.0001))
         targets = theano.shared(trgs, 'targets')
 
         l1 = T.dot(x, w1) + b1
@@ -46,9 +46,12 @@ class RNN:
             outputs=o3
         )
 
-        loss = T.sum(- T.log(o3[T.arange(targets.shape[0]), targets])) # TODO: it really does this? :D
+        #loss = T.sum(- T.log(o3[T.arange(targets.shape[0]), targets])) # TODO: it really does this? :D
+        loss = T.nnet.categorical_crossentropy(o3, targets).mean() # It also exists as a built-in function :)
 
-        errchrs = T.sum(T.switch(T.eq(T.argmax(o3, axis=1), targets), 0, 1))
+        prediction = T.argmax(o3, axis=1)
+
+        errchrs = T.sum(T.switch(T.eq(prediction, targets), 0, 1))
 
         #norml2reg = 10 * (T.sum(w1**2) + T.sum(w2**2) + T.sum(w3**2))
 
@@ -60,8 +63,8 @@ class RNN:
         self.params = [w1, b1, w2, b2, w3, b3]
 
         self.improvef = theano.function(
-            inputs=[lr],
-            outputs=(loss, errchrs),
+            inputs=[],
+            outputs=[],
             updates=[
                 (w1, w1 - lr * T.grad(loss, w1)),
                 (b1, b1 - lr * T.grad(loss, b1)),
@@ -69,8 +72,7 @@ class RNN:
                 (b2, b2 - lr * T.grad(loss, b2)),
                 (w3, w3 - lr * T.grad(loss, w3)),
                 (b3, b3 - lr * T.grad(loss, b3))
-            ],
-            allow_input_downcast=True
+            ]
         )
 
     def propagate(self):
@@ -92,8 +94,8 @@ class RNN:
             params.append(param + np.random.randn(*param.shape).astype(np.float32) * learning_rate)
         return params
 
-    def improve(self, learning_rate):
-        return self.improvef(learning_rate)
+    def improve(self):
+        return self.improvef()
 
 
 with open('training_set/sample_0.pickle', 'r') as f:
@@ -103,6 +105,7 @@ rnn = RNN(chunks.astype(np.float32), np.array(targets))
 
 i = 0
 while True:
-    loss, errchrs = rnn.improve(0.001 / (1 + i / 100))
+    rnn.improve()
+    loss, errchrs = rnn.loss()
     i += 1
     print i, errchrs, loss, np.sum(rnn.params[0].get_value()**2), np.sum(rnn.params[2].get_value()**2), np.sum(rnn.params[4].get_value()**2)
