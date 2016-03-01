@@ -27,7 +27,8 @@ class RNN:
         b2 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b2')
         w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.01).astype(np.float32), 'w3')
         b3 = theano.shared((np.random.randn(N_CLASSES) * 0.001).astype(np.float32), 'b3')
-        lr = theano.shared(np.float32(0.001))
+        lr = theano.shared(np.float32(0.1))
+        lrd = theano.shared(np.float32(0.95)) # shrink it to 1/10 on every 100 iterations
         targets = theano.shared(trgs, 'targets')
 
         l1 = T.dot(x, w1) + b1
@@ -62,16 +63,25 @@ class RNN:
 
         self.params = [w1, b1, w2, b2, w3, b3]
 
+        # TODO: ugly as fuck
+        gw1 = T.grad(loss, w1)
+        gb1 = T.grad(loss, b1)
+        gw2 = T.grad(loss, w2)
+        gb2 = T.grad(loss, b2)
+        gw3 = T.grad(loss, w3)
+        gb3 = T.grad(loss, b3)
+
         self.improvef = theano.function(
             inputs=[],
             outputs=[],
             updates=[
-                (w1, w1 - lr * T.grad(loss, w1)),
-                (b1, b1 - lr * T.grad(loss, b1)),
-                (w2, w2 - lr * T.grad(loss, w2)),
-                (b2, b2 - lr * T.grad(loss, b2)),
-                (w3, w3 - lr * T.grad(loss, w3)),
-                (b3, b3 - lr * T.grad(loss, b3))
+                (w1, w1 - lr * (gw1 / T.sum((gw1**2))**0.5)),
+                (b1, b1 - lr * (gb1 / T.sum((gb1**2))**0.5)),
+                (w2, w2 - lr * (gw2 / T.sum((gw2**2))**0.5)),
+                (b2, b2 - lr * (gb2 / T.sum((gb2**2))**0.5)),
+                (w3, w3 - lr * (gw3 / T.sum((gw3**2))**0.5)),
+                (b3, b3 - lr * (gb3 / T.sum((gb3**2))**0.5)),
+                (lr, lr*lrd)
             ]
         )
 
