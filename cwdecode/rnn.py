@@ -107,7 +107,6 @@ class RNN:
     def improve(self):
         return self.improvef()
 
-
 with open('training_set/sample_1.pickle', 'r') as f:
     chunks, targets = cPickle.load(f)
 
