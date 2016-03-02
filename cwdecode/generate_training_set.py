@@ -6,6 +6,7 @@ import numpy as np
 import scipy.signal as sig
 import random
 import cPickle
+import matplotlib.pyplot as plt
 
 from config import *
 
@@ -15,23 +16,23 @@ def wpm2dit(wpm):
 # The length of a dit. Deviation is in percent of dit length
 def dit_len(wpm, deviation):
     dl = wpm2dit(wpm)
-    return random.normalvariate(dl, dl * deviation)
+    return int(random.normalvariate(dl, dl * deviation) * FRAMERATE)
 
 # The length of a dah
 def dah_len(wpm, deviation, dahw = 3.0):
-    return dahw * dit_len(wpm, deviation)
+    return int(dahw * dit_len(wpm, deviation))
 
 # The length of pause between dits and dahs inside a character
 def symspace_len(wpm, deviation, symw = 1.0):
-    return symw * dit_len(wpm, deviation)
+    return int(symw * dit_len(wpm, deviation))
 
 # The length of pause between characters inside a word
 def chrspace_len(wpm, deviation, chrw = 3.0):
-    return chrw * dit_len(wpm, deviation)
+    return int(chrw * dit_len(wpm, deviation))
 
 # The length of a space between two words
 def wordspace_len(wpm, deviation, wsw = 7.0):
-    return wsw * dit_len(wpm, deviation)
+    return int(wsw * dit_len(wpm, deviation))
 
 # Generates <frames> length of white noise 
 def whitenoise(frames, vol):
@@ -51,83 +52,85 @@ def impulsenoise(frames, th):
 def qsb(frames, vol, f):
     return 1.0 - np.sin(np.linspace(0, 2 * np.pi * frames / FRAMERATE * f, frames)) * vol
 
+# Returns a random morse character
+def get_next_character():
+    return random.choice(MORSE_CHR[1:] + [' '] * 5)
+
+# Returns: ([(1/0, duration), ...], total length)
+def get_onoff_data(c, wpm, deviation, ):
+    pairs = []
+    length = 0
+    if c == ' ':
+        pairs.append((0.0, wordspace_len(wpm, deviation)))
+        length += pairs[-1][1]
+    else:
+        last_symspace_len = 0
+        for sym in CHARS[c]:
+            pairs.append((1.0, dit_len(wpm, deviation) if sym == '.' else dah_len(wpm, deviation)))
+            length += pairs[-1][1]
+            pairs.append((0.0, symspace_len(wpm, deviation)))
+            length += pairs[-1][1]
+        length -= pairs[-1][1]
+        pairs[-1] = (0.0, (chrspace_len(wpm, deviation)))
+        length += pairs[-1][1]
+    
+    return (pairs, length)
+
 # Returns a training sample of (chunks, 1-hot encoded training targets) as a np array
 def get_training_data():
-    wpm       = random.uniform(5.0, 50)
+    wpm       = random.uniform(10.0, 40.0)
     deviation = random.uniform(0.0, 0.15)
     wnvol     = random.uniform(0.01, 0.6)
     qsbvol    = random.uniform(0.0, 0.95)
     qsbf      = random.uniform(0.1, 1.0)
 
-    training_data = (np.zeros((SAMPLE_CHUNKS, CHUNK), dtype=np.float32), np.zeros(SAMPLE_CHUNKS, dtype=np.int16))
+    audio_data = np.zeros(SAMPLE_CHUNKS * CHUNK, dtype=np.float32)
+    target = np.zeros(SAMPLE_CHUNKS, dtype=np.int64)
 
-    padl = int(max(0, random.normalvariate(3, 0.2)) * FRAMERATE) # Padding at the beginning
-    pdr  = int(max(0, random.normalvariate(3, 0.2)) * FRAMERATE) # Padding at the end
-    sample_i = padl # The actual index in the samlpes
-    max_sound_len = 
+    padl = int(max(0, random.normalvariate(1, 0.2)) * FRAMERATE) # Padding at the beginning
+    i = padl # The actual index in the samlpes
     el = [];
-    c = 0
-    prev_c = 0
+    c = ' '
     while True:
-        # Generate a character
+        prev_c = c
         c = get_next_character()
-        # ...but not space at the beginning, or repeating spaces
-        while prev_c == 0 and c == 0
+        # Generate a character,
+        # but not space at the beginning, or repeating spaces
+        while prev_c == ' ' and c == ' ':
             c = get_next_character()
-        chr_samples = get_samples_for_chr(c)
+
+        # Get the audio samples for this character
+        # TODO: for fuck's sake rename this
+        pairs, length = get_onoff_data(c, wpm, deviation)
+
         # Check if it's too long to fit
-        if len(chr_samples) > sample_i + padr:
+        if i + length > SAMPLE_CHUNKS * CHUNK:
             break
-        # TODO
-        if c == ' ':
-            el.append((0.0, wordspace_len(wpm, deviation)))
-            sound_len += el[-1][1] # This should happend with append
-        else:
-            for sym in CHARS[c]:
-                el.append((1.0, dit_len(wpm, deviation) if sym == '.' else dah_len(wpm, deviation)))
-                sound_len += el[-1][1]
-                el.append((0.0, symspace_len(wpm, deviation)))
-                sound_len += el[-1][1]
-            sound_len -= el[-1][1] # This is just ugly
-            el = el[:-1]        #
-            el.append((0.0, chrspace_len(wpm, deviation)))
-            sound_len += el[-1][1]
-        timed_chars.append((c, sound_len))
-    
-    # Generate the sound for it (with padding at the end)
-    seql = (sound_len + min(0, random.normalvariate(3, 0.2))) * FRAMERATE
-    seql += CHUNK - seql % CHUNK # So seql % CHUNK == 0
-    seq = np.zeros(seql, dtype=np.float64)
 
-    i = padl * FRAMERATE
-    for e in el:
-        l = int(e[1] * FRAMERATE)
-        seq[i:(i+l)] = e[0]
-        i += l
+        # Write it into the big data array
+        for p in pairs:
+            audio_data[i:i+p[1]] = p[0]
+            i += p[1]
+        target[i // CHUNK] = MORSE_ORD[c]
 
-    return np.reshape(
-        (
-            seq # On-off sequence
-            * np.sin(np.arange(0, len(seq)) * (random.randint(400, 800) * 2 * np.pi / FRAMERATE)) # Baseband signal
-            * qsb(len(seq), qsbvol, qsbf)
-            + whitenoise(len(seq), wnvol)
-            + impulsenoise(len(seq), 4.2)
-        ) * 0.25, # Volume
-        (seql / CHUNK, CHUNK)
-    ).astype(np.float32), timed_chars
+    #plt.plot(audio_data)
+    #plt.show()
+
+    return ((
+        audio_data
+        * np.sin(np.arange(0, len(audio_data)) * (random.randint(400, 800) * 2 * np.pi / FRAMERATE), dtype=np.float32) # Baseband signal
+        * qsb(len(audio_data), qsbvol, qsbf)
+        + whitenoise(len(audio_data), wnvol)
+        + impulsenoise(len(audio_data), 4.2)
+    ) * 0.25).reshape((SAMPLE_CHUNKS, CHUNK)).astype(np.float32), target
     # TODO: filter for clicks (random filter between 1KHz - 50Hz)
     # TODO: QRM
-
-def random_text():
-    l = random.randint(5, 10)
-    ret = ''.join(random.choice(MORSE_CHR[1:] + [' '] * 6) for _ in xrange(l))
-    return re.sub(r'( +)', r' ', ret)
 
 def generate_random_sample(i):
     samplename = 'sample_' + str(i)
     training_data = get_training_data()
     with open(TRAINING_SET_DIR + '/' + samplename + '.pickle', 'w') as f:
-        cPickle.dump((chunks, chars), f)
+        cPickle.dump(training_data, f)
 
 for i in xrange(SETSIZE):
     print i

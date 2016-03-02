@@ -28,7 +28,8 @@ class RNN:
         w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.01).astype(np.float32), 'w3')
         b3 = theano.shared((np.random.randn(N_CLASSES) * 0.001).astype(np.float32), 'b3')
         lr = theano.shared(np.float32(0.1))
-        lrd = theano.shared(np.float32(0.95)) # shrink it to 1/10 on every 100 iterations
+        lrd = theano.shared(np.float32(0.97)) # shrink it to 1/10 on every 100 iterations
+        lrmin = theano.shared(np.float32(0.0002))
         targets = theano.shared(trgs, 'targets')
 
         l1 = T.dot(x, w1) + b1
@@ -81,7 +82,7 @@ class RNN:
                 (b2, b2 - lr * (gb2 / T.sum((gb2**2))**0.5)),
                 (w3, w3 - lr * (gw3 / T.sum((gw3**2))**0.5)),
                 (b3, b3 - lr * (gb3 / T.sum((gb3**2))**0.5)),
-                (lr, lr*lrd)
+                (lr, T.maximum(lr*lrd, lrmin))
             ]
         )
 
@@ -107,7 +108,7 @@ class RNN:
     def improve(self):
         return self.improvef()
 
-with open('training_set/sample_1.pickle', 'r') as f:
+with open('training_set/sample_0.pickle', 'r') as f:
     chunks, targets = cPickle.load(f)
 
 rnn = RNN(chunks.astype(np.float32), np.array(targets))
@@ -117,4 +118,9 @@ while True:
     rnn.improve()
     loss, errchrs = rnn.loss()
     i += 1
+    if loss < 0.01 and i % 100 == 0:
+        print "Saving network..."
+        with open('sample_1_overtrain.pickle', 'w') as f:
+            cPickle.dump(rnn.get_params(), f)
+
     print i, errchrs, loss, np.sum(rnn.params[0].get_value()**2), np.sum(rnn.params[2].get_value()**2), np.sum(rnn.params[4].get_value()**2)
