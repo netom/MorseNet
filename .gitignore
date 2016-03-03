@@ -2,3 +2,4 @@ training_set
 *.pkl
 *.pyc
 *.npz
+*.pickle

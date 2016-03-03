@@ -28,8 +28,6 @@ class RNN:
         w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.01).astype(np.float32), 'w3')
         b3 = theano.shared((np.random.randn(N_CLASSES) * 0.001).astype(np.float32), 'b3')
         self.lr = theano.shared(np.float32(0.1))
-        lrd = theano.shared(np.float32(0.97)) # shrink it to 1/10 on every 100 iterations
-        lrmin = theano.shared(np.float32(0.0002))
         targets = theano.shared(trgs, 'targets')
 
         l1 = T.dot(x, w1) + b1
@@ -48,7 +46,6 @@ class RNN:
             outputs=o3
         )
 
-        #loss = T.sum(- T.log(o3[T.arange(targets.shape[0]), targets])) # TODO: it really does this? :D
         loss = T.nnet.categorical_crossentropy(o3, targets).mean() # It also exists as a built-in function :)
 
         prediction = T.argmax(o3, axis=1)
@@ -107,10 +104,16 @@ class RNN:
     def improve(self):
         return self.improvef()
 
+#chunks  = np.zeros((3, SAMPLE_CHUNKS, CHUNK), dtype=np.float32)
+#targets = np.zeros((3, SAMPLE_CHUNKS), dtype=np.int64)
+#for i in xrange(3):
+#    with open('training_set/sample_%d.pickle' % i, 'r') as f:
+#        chunks[i], targets[i] = cPickle.load(f)
+
 with open('training_set/sample_0.pickle', 'r') as f:
     chunks, targets = cPickle.load(f)
 
-rnn = RNN(chunks.astype(np.float32), np.array(targets))
+rnn = RNN(chunks, targets)
 
 i = 0
 loss, errchrs = rnn.loss()
@@ -121,13 +124,13 @@ while True:
     i += 1
     if loss < 0.01 and i % 100 == 0:
         print "Saving network..."
-        with open('sample_1_overtrain.pickle', 'w') as f:
+        with open('sample_0_overtrain.pickle', 'w') as f:
             cPickle.dump(rnn.get_params(), f)
 
     print i, errchrs, loss, np.sum(rnn.params[0].get_value()**2), np.sum(rnn.params[2].get_value()**2), np.sum(rnn.params[4].get_value()**2)
 
     if prev_loss <= loss:
         old_lr = rnn.lr.get_value()
-        new_lr = old_lr / 2.0
+        new_lr = np.float32(old_lr * 0.8)
         print "Whoops, setting lr: %f -> %f" % (old_lr, new_lr)
         rnn.lr.set_value(new_lr)
