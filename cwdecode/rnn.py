@@ -27,7 +27,7 @@ class RNN:
         b2 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b2')
         w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.01).astype(np.float32), 'w3')
         b3 = theano.shared((np.random.randn(N_CLASSES) * 0.001).astype(np.float32), 'b3')
-        lr = theano.shared(np.float32(0.1))
+        self.lr = theano.shared(np.float32(0.1))
         lrd = theano.shared(np.float32(0.97)) # shrink it to 1/10 on every 100 iterations
         lrmin = theano.shared(np.float32(0.0002))
         targets = theano.shared(trgs, 'targets')
@@ -76,13 +76,12 @@ class RNN:
             inputs=[],
             outputs=[],
             updates=[
-                (w1, w1 - lr * (gw1 / T.sum((gw1**2))**0.5)),
-                (b1, b1 - lr * (gb1 / T.sum((gb1**2))**0.5)),
-                (w2, w2 - lr * (gw2 / T.sum((gw2**2))**0.5)),
-                (b2, b2 - lr * (gb2 / T.sum((gb2**2))**0.5)),
-                (w3, w3 - lr * (gw3 / T.sum((gw3**2))**0.5)),
-                (b3, b3 - lr * (gb3 / T.sum((gb3**2))**0.5)),
-                (lr, T.maximum(lr*lrd, lrmin))
+                (w1, w1 - self.lr * (gw1 / T.sum((gw1**2))**0.5)),
+                (b1, b1 - self.lr * (gb1 / T.sum((gb1**2))**0.5)),
+                (w2, w2 - self.lr * (gw2 / T.sum((gw2**2))**0.5)),
+                (b2, b2 - self.lr * (gb2 / T.sum((gb2**2))**0.5)),
+                (w3, w3 - self.lr * (gw3 / T.sum((gw3**2))**0.5)),
+                (b3, b3 - self.lr * (gb3 / T.sum((gb3**2))**0.5))
             ]
         )
 
@@ -114,7 +113,9 @@ with open('training_set/sample_0.pickle', 'r') as f:
 rnn = RNN(chunks.astype(np.float32), np.array(targets))
 
 i = 0
+loss, errchrs = rnn.loss()
 while True:
+    prev_loss = loss
     rnn.improve()
     loss, errchrs = rnn.loss()
     i += 1
@@ -124,3 +125,9 @@ while True:
             cPickle.dump(rnn.get_params(), f)
 
     print i, errchrs, loss, np.sum(rnn.params[0].get_value()**2), np.sum(rnn.params[2].get_value()**2), np.sum(rnn.params[4].get_value()**2)
+
+    if prev_loss <= loss:
+        old_lr = rnn.lr.get_value()
+        new_lr = old_lr / 2.0
+        print "Whoops, setting lr: %f -> %f" % (old_lr, new_lr)
+        rnn.lr.set_value(new_lr)
