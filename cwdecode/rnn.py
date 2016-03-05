@@ -27,7 +27,7 @@ class RNN:
         b2 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b2')
         w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.01).astype(np.float32), 'w3')
         b3 = theano.shared((np.random.randn(N_CLASSES) * 0.001).astype(np.float32), 'b3')
-        self.lr = theano.shared(np.float32(0.1))
+        self.lr = theano.shared(np.float32(0.1), 'lr')
         targets = theano.shared(trgs, 'targets')
 
         l1 = T.dot(x, w1) + b1
@@ -46,11 +46,13 @@ class RNN:
             outputs=o3
         )
 
-        loss = T.nnet.categorical_crossentropy(o3, targets).mean() # It also exists as a built-in function :)
+        #loss = -T.mean(T.log(o3)[T.arange(targets.shape[0]), targets])
+        #loss = -T.mean(T.log(o3[T.arange(targets.shape[0]), targets]))
+        loss = T.mean(T.nnet.categorical_crossentropy(o3, targets))
 
         prediction = T.argmax(o3, axis=1)
 
-        errchrs = T.sum(T.switch(T.eq(prediction, targets), 0, 1))
+        errchrs = T.sum(T.switch(T.eq(prediction, T.argmax(targets)), 0, 1))
 
         #norml2reg = 10 * (T.sum(w1**2) + T.sum(w2**2) + T.sum(w3**2))
 
@@ -61,25 +63,14 @@ class RNN:
 
         self.params = [w1, b1, w2, b2, w3, b3]
 
-        # TODO: ugly as fuck
-        gw1 = T.grad(loss, w1)
-        gb1 = T.grad(loss, b1)
-        gw2 = T.grad(loss, w2)
-        gb2 = T.grad(loss, b2)
-        gw3 = T.grad(loss, w3)
-        gb3 = T.grad(loss, b3)
-
+        # Gradient list
+        grads  = map(lambda p: T.grad(loss, p), self.params)
+        # Weight update function
         self.improvef = theano.function(
-            inputs=[],
-            outputs=[],
-            updates=[
-                (w1, w1 - self.lr * (gw1 / T.sum((gw1**2))**0.5)),
-                (b1, b1 - self.lr * (gb1 / T.sum((gb1**2))**0.5)),
-                (w2, w2 - self.lr * (gw2 / T.sum((gw2**2))**0.5)),
-                (b2, b2 - self.lr * (gb2 / T.sum((gb2**2))**0.5)),
-                (w3, w3 - self.lr * (gw3 / T.sum((gw3**2))**0.5)),
-                (b3, b3 - self.lr * (gb3 / T.sum((gb3**2))**0.5))
-            ]
+            inputs  = [],
+            outputs = [],
+            profile = True,
+            updates = map(lambda pg: (pg[0], pg[0] - self.lr * (pg[1] / T.sum(pg[1]**2)**0.5)), zip(self.params, grads))
         )
 
     def propagate(self):
@@ -88,21 +79,11 @@ class RNN:
     def loss(self):
         return self.lossf()
 
+    def improve(self):
+        self.improvef()
+
     def get_params(self):
         return map(lambda x: x.get_value(), self.params)
-
-    def set_params(self, params):
-        for i in xrange(len(params)):
-            self.params[i].set_value(params[i])
-
-    def neighbour_params(self, learning_rate):
-        params = []
-        for param in self.get_params():
-            params.append(param + np.random.randn(*param.shape).astype(np.float32) * learning_rate)
-        return params
-
-    def improve(self):
-        return self.improvef()
 
 #chunks  = np.zeros((3, SAMPLE_CHUNKS, CHUNK), dtype=np.float32)
 #targets = np.zeros((3, SAMPLE_CHUNKS), dtype=np.int64)
@@ -118,19 +99,24 @@ rnn = RNN(chunks, targets)
 i = 0
 loss, errchrs = rnn.loss()
 while True:
-    prev_loss = loss
+    #prev_loss = loss
     rnn.improve()
     loss, errchrs = rnn.loss()
     i += 1
-    if loss < 0.01 and i % 100 == 0:
-        print "Saving network..."
-        with open('sample_0_overtrain.pickle', 'w') as f:
-            cPickle.dump(rnn.get_params(), f)
+    #if loss < 0.01 and i % 100 == 0:
+    #    print "Saving network..."
+    #    with open('sample_0_overtrain.pickle', 'w') as f:
+    #        cPickle.dump(rnn.get_params(), f)
 
-    print i, errchrs, loss, np.sum(rnn.params[0].get_value()**2), np.sum(rnn.params[2].get_value()**2), np.sum(rnn.params[4].get_value()**2)
+    #print i, errchrs, loss, np.sum(rnn.params[0].get_value()**2), np.sum(rnn.params[2].get_value()**2), np.sum(rnn.params[4].get_value()**2)
+    print i, errchrs, loss
+    #theano.printing.pydotprint(rnn.improvef, "graph_improvef.png")
+    #theano.printing.pydotprint(rnn.lossf, "graph_lossf.png")
 
-    if prev_loss <= loss:
-        old_lr = rnn.lr.get_value()
-        new_lr = np.float32(old_lr * 0.8)
-        print "Whoops, setting lr: %f -> %f" % (old_lr, new_lr)
-        rnn.lr.set_value(new_lr)
+    #if prev_loss <= loss:
+    #    old_lr = rnn.lr.get_value()
+    #    new_lr = np.float32(old_lr * 0.8)
+    #    print "Whoops, setting lr: %f -> %f" % (old_lr, new_lr)
+    #    rnn.lr.set_value(new_lr)
+    if i >= 10:
+        break

@@ -85,7 +85,8 @@ def get_training_data():
     qsbf      = random.uniform(0.1, 1.0)
 
     audio_data = np.zeros(SAMPLE_CHUNKS * CHUNK, dtype=np.float32)
-    target = np.zeros(SAMPLE_CHUNKS, dtype=np.int64)
+    target = np.zeros((SAMPLE_CHUNKS, len(MORSE_CHR)), dtype=np.float32)
+    #target = np.zeros(SAMPLE_CHUNKS, dtype=np.int64)
 
     padl = int(max(0, random.normalvariate(1, 0.2)) * FRAMERATE) # Padding at the beginning
     i = padl # The actual index in the samlpes
@@ -111,7 +112,8 @@ def get_training_data():
         for p in pairs:
             audio_data[i:i+p[1]] = p[0]
             i += p[1]
-        target[i // CHUNK] = MORSE_ORD[c]
+        target[i // CHUNK][MORSE_ORD[c]] = 1
+        #target[i // CHUNK] = MORSE_ORD[c]
 
     #plt.plot(audio_data)
     #plt.show()
