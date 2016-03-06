@@ -78,15 +78,15 @@ def get_onoff_data(c, wpm, deviation, ):
 
 # Returns a training sample of (chunks, 1-hot encoded training targets) as a np array
 def get_training_data():
-    wpm       = random.uniform(10.0, 40.0)
-    deviation = random.uniform(0.0, 0.15)
-    wnvol     = random.uniform(0.01, 0.6)
-    qsbvol    = random.uniform(0.0, 0.95)
-    qsbf      = random.uniform(0.1, 1.0)
+    wpm       = random.uniform(20.0, 20.0)
+    deviation = random.uniform(0.05, 0.05)
+    wnvol     = random.uniform(0.1, 0.1)
+    qsbvol    = random.uniform(0.1, 0.1)
+    qsbf      = random.uniform(0.3, 0.3)
 
     audio_data = np.zeros(SAMPLE_CHUNKS * CHUNK, dtype=np.float32)
-    target = np.zeros((SAMPLE_CHUNKS, len(MORSE_CHR)), dtype=np.float32)
-    #target = np.zeros(SAMPLE_CHUNKS, dtype=np.int64)
+    #target = np.zeros((SAMPLE_CHUNKS, len(MORSE_CHR)), dtype=np.float32)
+    target = np.zeros(SAMPLE_CHUNKS, dtype=np.int64)
 
     padl = int(max(0, random.normalvariate(1, 0.2)) * FRAMERATE) # Padding at the beginning
     i = padl # The actual index in the samlpes
@@ -112,18 +112,15 @@ def get_training_data():
         for p in pairs:
             audio_data[i:i+p[1]] = p[0]
             i += p[1]
-        target[i // CHUNK][MORSE_ORD[c]] = 1
-        #target[i // CHUNK] = MORSE_ORD[c]
-
-    #plt.plot(audio_data)
-    #plt.show()
+        #target[i // CHUNK][MORSE_ORD[c]] = 1
+        target[i // CHUNK] = MORSE_ORD[c]
 
     return ((
         audio_data
-        * np.sin(np.arange(0, len(audio_data)) * (random.randint(400, 800) * 2 * np.pi / FRAMERATE), dtype=np.float32) # Baseband signal
+        #* np.sin(np.arange(0, len(audio_data)) * (random.randint(500, 700) * 2 * np.pi / FRAMERATE), dtype=np.float32) # Baseband signal
         * qsb(len(audio_data), qsbvol, qsbf)
         + whitenoise(len(audio_data), wnvol)
-        + impulsenoise(len(audio_data), 4.2)
+        #+ impulsenoise(len(audio_data), 4.2)
     ) * 0.25).reshape((SAMPLE_CHUNKS, CHUNK)).astype(np.float32), target
     # TODO: filter for clicks (random filter between 1KHz - 50Hz)
     # TODO: QRM
@@ -131,6 +128,8 @@ def get_training_data():
 def generate_random_sample(i):
     samplename = 'sample_' + str(i)
     training_data = get_training_data()
+    #plt.plot(training_data[0].reshape(CHUNK * SAMPLE_CHUNKS))
+    #plt.show()
     with open(TRAINING_SET_DIR + '/' + samplename + '.pickle', 'w') as f:
         cPickle.dump(training_data, f)
 
