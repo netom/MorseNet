@@ -5,18 +5,17 @@ DEVICE = 0
 FRAMERATE = 882 # Roughly 50Hz wide bins
 
 # Size of buffer processed by the neural network in a single step
-CHUNK = 128
+CHUNK = 32
 
-# The number of examples to generate
-SETSIZE = 100
+# The number of batches to generate
+NUM_BATCHES = 100
+
+# The size of a batch
+BATCH_SIZE = 10
 
 # The size of a sample in chunks (10 seconds)
-SAMPLE_CHUNKS = FRAMERATE * 10 // CHUNK
-# Learn on approx. 5 sec backwards
-LSTM_TRUNCATED_GRADIENT = SAMPLE_CHUNKS / 3
-
-# Size of a minibatch
-MINIBATCH_SIZE = 20
+MIN_SEQ_LENGTH = FRAMERATE * 10 // CHUNK
+MAX_SEQ_LENGTH = FRAMERATE * 30 // CHUNK
 
 # The directory in wich the examples are saved
 TRAINING_SET_DIR = 'training_set'

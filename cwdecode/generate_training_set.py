@@ -44,7 +44,6 @@ def impulsenoise(frames, th):
     r[r < th] = 0.0
     i = r >= th
     r[r >= th] = 1.0
-    #r[i] = (r[i] - th) / (1.0 - th)
     ret = sig.convolve(r, [1.0] * 10 + [-1.0] * 10, mode='same')
     return ret
 
@@ -77,16 +76,28 @@ def get_onoff_data(c, wpm, deviation, ):
     return (pairs, length)
 
 # Returns a training sample of (chunks, 1-hot encoded training targets) as a np array
-def get_training_data():
-    wpm       = random.uniform(20.0, 20.0)
-    deviation = random.uniform(0.05, 0.05)
-    wnvol     = random.uniform(0.1, 0.1)
-    qsbvol    = random.uniform(0.1, 0.1)
-    qsbf      = random.uniform(0.3, 0.3)
+def generate_batch():
+    seq_length = int(random.uniform(MIN_SEQ_LENGTH, MAX_SEQ_LENGTH))
 
-    audio_data = np.zeros(SAMPLE_CHUNKS * CHUNK, dtype=np.float32)
-    #target = np.zeros((SAMPLE_CHUNKS, len(MORSE_CHR)), dtype=np.float32)
-    target = np.zeros(SAMPLE_CHUNKS, dtype=np.int64)
+    xb = np.zeros((seq_length, BATCH_SIZE, CHUNK), dtype=np.float32)
+    yb = np.zeros((seq_length, BATCH_SIZE), dtype=np.int64)
+
+    for i in xrange(BATCH_SIZE):
+       x, y = generate_seq(seq_length)
+       xb[:,i,:] = x
+       yb[:,i]   = y
+
+    return (xb, yb)
+
+def generate_seq(seq_length):
+    wpm        = random.uniform(15.0, 25.0)
+    deviation  = random.uniform(0.0, 0.1)
+    wnvol      = random.uniform(0.0, 0.3)
+    qsbvol     = random.uniform(0.0, 0.7)
+    qsbf       = random.uniform(0.1, 0.5)
+
+    x = np.zeros(seq_length * CHUNK, dtype=np.float32)
+    y = np.zeros(seq_length, dtype=np.int64)
 
     padl = int(max(0, random.normalvariate(1, 0.2)) * FRAMERATE) # Padding at the beginning
     i = padl # The actual index in the samlpes
@@ -105,34 +116,33 @@ def get_training_data():
         pairs, length = get_onoff_data(c, wpm, deviation)
 
         # Check if it's too long to fit
-        if i + length > SAMPLE_CHUNKS * CHUNK:
+        if i + length >= seq_length * CHUNK:
             break
 
         # Write it into the big data array
         for p in pairs:
-            audio_data[i:i+p[1]] = p[0]
+            x[i:i+p[1]] = p[0]
             i += p[1]
-        #target[i // CHUNK][MORSE_ORD[c]] = 1
-        target[i // CHUNK] = MORSE_ORD[c]
+        y[i // CHUNK] = MORSE_ORD[c]
 
     return ((
-        audio_data
+        x
         #* np.sin(np.arange(0, len(audio_data)) * (random.randint(500, 700) * 2 * np.pi / FRAMERATE), dtype=np.float32) # Baseband signal
-        * qsb(len(audio_data), qsbvol, qsbf)
-        + whitenoise(len(audio_data), wnvol)
+        * qsb(len(x), qsbvol, qsbf)
+        + whitenoise(len(x), wnvol)
         #+ impulsenoise(len(audio_data), 4.2)
-    ) * 0.25).reshape((SAMPLE_CHUNKS, CHUNK)).astype(np.float32), target
+    ) * 0.25).reshape((seq_length, CHUNK)).astype(np.float32), y
     # TODO: filter for clicks (random filter between 1KHz - 50Hz)
     # TODO: QRM
 
-def generate_random_sample(i):
-    samplename = 'sample_' + str(i)
-    training_data = get_training_data()
+def save_new_batch(i):
+    batch = generate_batch()
     #plt.plot(training_data[0].reshape(CHUNK * SAMPLE_CHUNKS))
     #plt.show()
-    with open(TRAINING_SET_DIR + '/' + samplename + '.pickle', 'w') as f:
-        cPickle.dump(training_data, f)
+    with open(TRAINING_SET_DIR + '/batch_' + str(i) + '.pickle', 'w') as f:
+        cPickle.dump(batch, f)
 
-for i in xrange(SETSIZE):
+for i in xrange(NUM_BATCHES):
     print i
-    generate_random_sample(i)
+    save_new_batch(i)
+

@@ -1,6 +1,7 @@
 Cython
 numpy
 scipy
+matplotlib
 picklable-itertools==0.1.1
 progressbar2==3.6.0
 pyyaml==3.11
