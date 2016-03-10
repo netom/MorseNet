@@ -1,0 +1,83 @@
+layer {
+  name: "ip_input"
+  type: "InnerProduct"
+
+  # learning rate and decay multipliers for the weights
+  param { lr_mult: 1 decay_mult: 1 }
+
+  # learning rate and decay multipliers for the biases
+  param { lr_mult: 2 decay_mult: 0 }
+
+  inner_product_param {
+    num_output: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  top: "output"
+  bottom: "hidden1"
+}
+
+layer {
+  name: "encode1neuron"
+  bottom: "encode1"
+  top: "encode1neuron"
+  type: "TanH"
+  top: "hidden1"
+  bottom: "hidden1_lin"
+}
+
+layer {
+  name: "ip_input"
+  type: "InnerProduct"
+
+  # learning rate and decay multipliers for the weights
+  param { lr_mult: 1 decay_mult: 1 }
+
+  # learning rate and decay multipliers for the biases
+  param { lr_mult: 2 decay_mult: 0 }
+
+  inner_product_param {
+    num_output: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  top: "hidden1_lin"
+  bottom: "truth_table"
+}
+
+layer {
+  name: "truth_table"
+
+  # Data layer loads leveldb or lmdb storage DBs for high-throughput.
+  type: "Data"
+
+  # the 1st top is the data itself
+  top: "gate_inputs"
+
+  # the 2nd top is the ground truth
+  top: "gate_outputs"
+
+  # the Data layer configuration
+  data_param {
+    # path to the DB
+    source: "xordb.hdf5"
+
+    # type of DB: LEVELDB or LMDB (LMDB supports concurrent reads)
+    backend: HDF5
+
+    # batch processing improves efficiency. This is the whole set in this case.
+    batch_size: 4
+  }
+}

@@ -55,7 +55,7 @@ class LSTM:
         # Learning rate
         lr = theano.shared(np.float32(0.01))
         lrr = theano.shared(np.float32(0.9965)) # 1/2 per 200
-        lrmin = theano.shared(np.float32(0.001))
+        lrmin = theano.shared(np.float32(0.00001))
 
         #
         # Parameters
