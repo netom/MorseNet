@@ -24,6 +24,8 @@ import blocks.main_loop as blml
 from fuel.streams import DataStream
 from fuel.datasets import IterableDataset
 
+from collections import OrderedDict
+
 N_CLASSES  = len(MORSE_CHR)
 
 #
@@ -42,7 +44,7 @@ def get_datastream(num_batches, offset):
         x.append(x_b)
         y.append(y_b)
 
-    return DataStream(dataset=IterableDataset({'x': x, 'y': y}))
+    return DataStream(dataset=IterableDataset(OrderedDict([('x', x), ('y', y)])))
 
 stream_train = get_datastream(20, 0)
 stream_test  = get_datastream(20, 20)
@@ -58,6 +60,7 @@ input_layer = br.MLP(
     biases_init=blinit.Constant(0)
 )
 input_layer_app = input_layer.apply(x)
+input_layer.initialize()
 
 middle_layer = brrec.LSTM(
     dim=CHUNK,
@@ -67,23 +70,24 @@ middle_layer = brrec.LSTM(
     biases_init=blinit.Constant(0)
 )
 middle_layer_h, middle_layer_c = middle_layer.apply(input_layer_app)
+middle_layer.initialize()
 
-output_layer = br.MLP(
-    activations=[br.Softmax()],
-    dims=[CHUNK, N_CLASSES],
+output_layer = br.Linear(
+    input_dim=CHUNK,
+    output_dim=N_CLASSES,
     name='output_layer',
     weights_init=blinit.IsotropicGaussian(),
     biases_init=blinit.Constant(0)
 )
-
-y_hat = output_layer.apply(middle_layer_h[-1])
-
-cost = brcost.CategoricalCrossEntropy().apply(y.flatten(), y_hat)
-cost.name = 'cost'
-
-input_layer.initialize()
-middle_layer.initialize()
+output_layer_app = output_layer.apply(middle_layer_h)
 output_layer.initialize()
+
+y_hat = br.NDimensionalSoftmax().apply(output_layer_app, extra_ndim=1)
+
+# Eddig ok
+
+cost = brcost.CategoricalCrossEntropy().apply(y, y_hat)
+cost.name = 'cost'
 
 cg = blgraph.ComputationGraph(cost)
 
