@@ -86,7 +86,7 @@ y_hat = br.NDimensionalSoftmax().apply(output_layer_app, extra_ndim=1)
 
 # Eddig ok
 
-cost = brcost.CategoricalCrossEntropy().apply(y, y_hat)
+cost = brcost.CategoricalCrossEntropy().apply(T.flatten(y), T.flatten(y_hat.swapaxes(0,2), outdim=2))
 cost.name = 'cost'
 
 cg = blgraph.ComputationGraph(cost)
@@ -113,7 +113,7 @@ main_loop = blml.MainLoop(algorithm, stream_train,
     extensions=[
         test_monitor,
         train_monitor,
-        blext.FinishAfter(after_n_epochs=10),
+        blext.FinishAfter(after_n_epochs=1000),
         blext.Printing(),
         blext.ProgressBar()
     ]
