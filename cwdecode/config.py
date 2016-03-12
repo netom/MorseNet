@@ -5,13 +5,13 @@ DEVICE = 0
 FRAMERATE = 882 # Roughly 50Hz wide bins
 
 # Size of buffer processed by the neural network in a single step
-CHUNK = 32
+CHUNK = 64
 
 # The number of batches to generate
 NUM_BATCHES = 100
 
 # The size of a batch
-BATCH_SIZE = 10
+BATCH_SIZE = 30
 
 # The size of a sample in chunks (10 seconds)
 MIN_SEQ_LENGTH = FRAMERATE * 10 // CHUNK

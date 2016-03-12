@@ -90,11 +90,12 @@ def generate_batch():
     return (xb, yb)
 
 def generate_seq(seq_length):
-    wpm        = random.uniform(15.0, 25.0)
-    deviation  = random.uniform(0.0, 0.1)
-    wnvol      = random.uniform(0.0, 0.3)
-    qsbvol     = random.uniform(0.0, 0.7)
-    qsbf       = random.uniform(0.1, 0.5)
+    wpm        = random.uniform(5.0, 50.0)
+    deviation  = random.uniform(0.0, 0.05)
+    wnvol      = random.uniform(0.0, 0.1)
+    qsbvol     = random.uniform(0.0, 0.1)
+    qsbf       = random.uniform(0.1, 0.7)
+    vol        = random.uniform(0.8, 1.0)
 
     x = np.zeros(seq_length * CHUNK, dtype=np.float32)
     y = np.zeros(seq_length, dtype=np.int64)
@@ -126,7 +127,7 @@ def generate_seq(seq_length):
         y[i // CHUNK] = MORSE_ORD[c]
 
     return ((
-        x
+        x * vol
         #* np.sin(np.arange(0, len(audio_data)) * (random.randint(500, 700) * 2 * np.pi / FRAMERATE), dtype=np.float32) # Baseband signal
         * qsb(len(x), qsbvol, qsbf)
         + whitenoise(len(x), wnvol)
