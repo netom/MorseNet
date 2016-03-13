@@ -2,20 +2,23 @@
 DEVICE = 0
 
 # Used audio sampling rate
-FRAMERATE = 882 # Roughly 50Hz wide bins
+FRAMERATE = 8000
+
+# The size of the FFT (no FFT used yet)
+FFT_SIZE = 128 # 62.5Hz wide bins
 
 # Size of buffer processed by the neural network in a single step
-CHUNK = 64
+CHUNK = 128
 
 # The number of batches to generate
-NUM_BATCHES = 100
+NUM_BATCHES = 1000
 
 # The size of a batch
 BATCH_SIZE = 30
 
 # The size of a sample in chunks (10 seconds)
-MIN_SEQ_LENGTH = FRAMERATE * 10 // CHUNK
-MAX_SEQ_LENGTH = FRAMERATE * 30 // CHUNK
+MIN_SEQ_LENGTH = FRAMERATE * 10
+MAX_SEQ_LENGTH = FRAMERATE * 30
 
 # The directory in wich the examples are saved
 TRAINING_SET_DIR = 'training_set'
