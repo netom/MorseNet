@@ -14,7 +14,7 @@ CHUNK = 128
 NUM_BATCHES = 1000
 
 # The size of a batch
-BATCH_SIZE = 30
+BATCH_SIZE = 50
 
 # The size of a sample in chunks (10 seconds)
 MIN_SEQ_LENGTH = FRAMERATE * 10

@@ -58,7 +58,7 @@ def get_datastream(offset, num_batches):
             audio_fft = np.fft.rfft(reshaped_padded_audio)[:,10]
             audio_fft = audio_fft[:,np.newaxis]
             x_b[:,j,:] = np.sqrt(audio_fft.real**2 + audio_fft.imag**2)
-            
+
             #plt.plot(x_b[:,j,:].flatten())
             #plt.show()
 
@@ -87,8 +87,8 @@ x = T.ftensor3('x')
 y = T.lmatrix('y')
 
 input_layer = br.MLP(
-    activations=[br.Rectifier()],
-    dims=[1, 64*4],
+    activations=[br.Rectifier(), br.Rectifier()],
+    dims=[1, 64, 128*4],
     name='input_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
@@ -97,7 +97,7 @@ input_layer_app = input_layer.apply(x)
 input_layer.initialize()
 
 middle_layer = brrec.LSTM(
-    dim=64,
+    dim=128,
     activation=br.Tanh(),
     name='lstm',
     weights_init=blinit.IsotropicGaussian(0.01),
@@ -107,7 +107,7 @@ middle_layer_h, middle_layer_c = middle_layer.apply(input_layer_app)
 middle_layer.initialize()
 
 output_layer = br.Linear(
-    input_dim=64,
+    input_dim=128,
     output_dim=N_CLASSES,
     name='output_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
