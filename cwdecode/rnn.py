@@ -73,8 +73,8 @@ def get_datastream(offset, num_batches):
 
     return DataStream(dataset=IterableDataset(OrderedDict([('x', x), ('y', y)])))
 
-stream_train = get_datastream(0,   500)
-stream_test  = get_datastream(500, 100)
+stream_train = get_datastream(0,   50)
+stream_test  = get_datastream(50, 10)
 
 x = T.ftensor3('x')
 y = T.lmatrix('y')
@@ -83,8 +83,8 @@ input_layer = br.MLP(
     activations=[br.Rectifier()],
     dims=[CHUNK, 128],
     name='input_layer',
-    weights_init=blinit.IsotropicGaussian(0.01),
-    biases_init=blinit.Constant(0)
+    weights_init=blinit.Orthogonal(),
+    biases_init=blinit.Constant(0.0)
 )
 input_layer_app = input_layer.apply(x)
 input_layer.initialize()
@@ -93,8 +93,8 @@ recurrent_layer = brrec.SimpleRecurrent(
     dim=128,
     activation=br.Rectifier(),
     name='rnn',
-    weights_init=blinit.IsotropicGaussian(0.01),
-    biases_init=blinit.Constant(0)
+    weights_init=blinit.Orthogonal(0.5),
+    biases_init=blinit.Constant(0.0)
 )
 recurrent_layer_app = recurrent_layer.apply(input_layer_app)
 recurrent_layer.initialize()
@@ -103,8 +103,8 @@ output_layer = input_layer = br.MLP(
     activations=[br.Rectifier(), None],
     dims=[128, 64, N_CLASSES],
     name='output_layer',
-    weights_init=blinit.IsotropicGaussian(0.01),
-    biases_init=blinit.Constant(0)
+    weights_init=blinit.Orthogonal(),
+    biases_init=blinit.Constant(0.0)
 )
 output_layer_app = output_layer.apply(recurrent_layer_app)
 output_layer.initialize()
@@ -130,7 +130,7 @@ cg = blgraph.ComputationGraph(cost)
 algorithm = blalg.GradientDescent(
     cost=cost,
     parameters=cg.parameters,
-    step_rule=blalg.Adam()
+    step_rule=blalg.Adam() # TODO: look at code, default parameters are suspicious
 )
 
 test_monitor = blmon.DataStreamMonitoring(
