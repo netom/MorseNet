@@ -3,120 +3,165 @@
 
 # See architecture.md
 
+import sys
+import wave
 import theano
 import cPickle
 import numpy as np
 from config import *
 import theano.tensor as T
-import theano.gradient as G
+
+import blocks as bl
+import blocks.bricks as br
+import blocks.graph as blgraph
+import blocks.bricks.cost as brcost
+import blocks.initialization as blinit
+import blocks.bricks.recurrent as brrec
+import blocks.extensions.monitoring as lbmon
+import blocks.extensions as blext
+import blocks.algorithms as blalg
+import blocks.extensions.monitoring as blmon
+import blocks.main_loop as blml
+
+from fuel.streams import DataStream
+from fuel.datasets import IterableDataset
+
+from collections import OrderedDict
+
+import scipy.io.wavfile
 
 N_CLASSES  = len(MORSE_CHR)
 
-# Architecture:
 #
-# 1st layer: softplus, (CHUNK,CHUNK)
-# 2nd layer: softplus, output fed back with new input (CHUNK+N_CLASSES,N_CLASSES)
-# 3rd layer: softmax classifier (N_CLASSES, N_CLASSES)
-class RNN:
+# "Dimension" of the audio data in the stream:
+# - The number of chunks in the sequence
+# - Batch size: The number of sequences in a batch
+# - Chunk size: The number of samples in a chunk
+#
+def get_datastream(offset, num_batches):
+    x = []
+    y = []
+    print "Loading %d batches with %d samples each..." % (num_batches, BATCH_SIZE)
+    for i in xrange(num_batches):
+        dirname = TRAINING_SET_DIR + '/%04d' % (offset + i)
+        seq_length = int(open(dirname + '/config.txt').read().strip())
+        x_b = np.zeros(((seq_length // CHUNK) + 1, BATCH_SIZE, CHUNK), dtype=np.float32)
+        y_b = np.zeros((seq_length // CHUNK + 1, BATCH_SIZE), dtype=np.int64)
+        for j in xrange(BATCH_SIZE):
+            _, audio = scipy.io.wavfile.read(dirname + '/%03d.wav' % j)
+            audio =  (audio / 2**13).astype(np.float32)
 
-    def __init__(self, chunks, trgs):
-        x  = theano.shared(chunks, 'x')
-        w1 = theano.shared((np.random.randn(CHUNK, CHUNK) * 0.01).astype(np.float32), 'w1')
-        b1 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b1')
-        w2 = theano.shared((np.random.randn(CHUNK * 2, CHUNK) * 0.01).astype(np.float32), 'w2')
-        b2 = theano.shared((np.random.randn(CHUNK) * 0.001).astype(np.float32), 'b2')
-        w3 = theano.shared((np.random.randn(CHUNK, N_CLASSES) * 0.01).astype(np.float32), 'w3')
-        b3 = theano.shared((np.random.randn(N_CLASSES) * 0.001).astype(np.float32), 'b3')
-        self.lr = theano.shared(np.float32(0.1), 'lr')
-        targets = theano.shared(trgs, 'targets')
+            padded_audio = np.pad(audio, (0, CHUNK - (len(audio) % CHUNK)), 'constant', constant_values=(0, 0))
+            reshaped_padded_audio = padded_audio.reshape((len(padded_audio) // CHUNK, CHUNK))
+            x_b[:,j,:] = reshaped_padded_audio
 
-        l1 = T.dot(x, w1) + b1
-        o1 = T.switch(T.lt(l1, 0), 0, l1)
+            f = open(dirname + '/%03d.txt' % j, 'r')
+            lines = map(lambda line: line.split(','), filter(lambda line: line != '', map(lambda line: line.rstrip(), f.readlines())))
+            chars = map(lambda rec: (MORSE_ORD[rec[0]], float(rec[1])), lines)
+            f.close()
 
-        o2, _ = theano.scan(
-            fn=lambda o1, o2_: T.switch(T.dot(T.concatenate([o1, o2_]), w2) + b2 < 0, 0, T.dot(T.concatenate([o1, o2_]), w2) + b2),
-            outputs_info=T.zeros_like(b2),
-            sequences=[o1]
-        )
+            for char in chars:
+                y_b[char[1] * FRAMERATE // CHUNK][j] = char[0]
 
-        o3 = T.nnet.softmax(T.dot(o2, w3) + b3)
+        sys.stdout.write("\rLoaded %d... " % (i+1))
+        sys.stdout.flush()
 
-        self.f = theano.function(
-            inputs=[],
-            outputs=o3
-        )
+        x.append(x_b)
+        y.append(y_b)
 
-        #loss = -T.mean(T.log(o3)[T.arange(targets.shape[0]), targets])
-        #loss = -T.mean(T.log(o3[T.arange(targets.shape[0]), targets]))
-        loss = T.mean(T.nnet.categorical_crossentropy(o3, targets))
+    print "\nDone.\n"
 
-        prediction = T.argmax(o3, axis=1)
+    return DataStream(dataset=IterableDataset(OrderedDict([('x', x), ('y', y)])))
 
-        errchrs = T.sum(T.switch(T.eq(prediction, T.argmax(targets)), 0, 1))
+stream_train = get_datastream(0, 5)
+stream_test  = get_datastream(5, 5)
 
-        #norml2reg = 10 * (T.sum(w1**2) + T.sum(w2**2) + T.sum(w3**2))
+x = T.ftensor3('x')
+y = T.lmatrix('y')
 
-        self.lossf = theano.function(
-            inputs=[],
-            outputs=(loss, errchrs)
-        )
+input_layer = br.MLP(
+    activations=[br.Rectifier()],
+    dims=[CHUNK, CHUNK],
+    name='input_layer',
+    weights_init=blinit.IsotropicGaussian(0.01),
+    biases_init=blinit.Constant(0)
+)
+input_layer_app = input_layer.apply(x)
+input_layer.initialize()
 
-        self.params = [w1, b1, w2, b2, w3, b3]
+recurrent_layer = brrec.SimpleRecurrent(
+    dim=CHUNK,
+    activation=br.Rectifier(),
+    name='rnn',
+    weights_init=blinit.IsotropicGaussian(0.01),
+    biases_init=blinit.Constant(0)
+)
+recurrent_layer_app = recurrent_layer.apply(input_layer_app)
+recurrent_layer.initialize()
 
-        # Gradient list
-        grads  = map(lambda p: T.grad(loss, p), self.params)
-        # Weight update function
-        self.improvef = theano.function(
-            inputs  = [],
-            outputs = [],
-            profile = True,
-            updates = map(lambda pg: (pg[0], pg[0] - self.lr * (pg[1] / T.sum(pg[1]**2)**0.5)), zip(self.params, grads))
-        )
+output_layer = input_layer = br.MLP(
+    activations=[None],
+    dims=[CHUNK, N_CLASSES],
+    name='output_layer',
+    weights_init=blinit.IsotropicGaussian(0.01),
+    biases_init=blinit.Constant(0)
+)
+output_layer_app = output_layer.apply(recurrent_layer_app)
+output_layer.initialize()
 
-    def propagate(self):
-        return self.f()
+y_hat_flat = br.Softmax().apply(output_layer_app.reshape((output_layer_app.shape[0]*output_layer_app.shape[1], output_layer_app.shape[2])))
 
-    def loss(self):
-        return self.lossf()
+y_flat = T.flatten(y)
 
-    def improve(self):
-        self.improvef()
+cost = brcost.CategoricalCrossEntropy().apply(y_flat, y_hat_flat)
+cost.name = 'cost'
 
-    def get_params(self):
-        return map(lambda x: x.get_value(), self.params)
+y_hat_flat_onehot = T.argmax(y_hat_flat, axis=1)
 
-#chunks  = np.zeros((3, SAMPLE_CHUNKS, CHUNK), dtype=np.float32)
-#targets = np.zeros((3, SAMPLE_CHUNKS), dtype=np.int64)
-#for i in xrange(3):
-#    with open('training_set/sample_%d.pickle' % i, 'r') as f:
-#        chunks[i], targets[i] = cPickle.load(f)
+characters                                    = T.switch(T.neq(y_flat, 0), np.float32(1.0), np.float32(0))
+chunks_gotten_right                           = T.switch(T.eq(y_hat_flat_onehot, y_flat), np.float32(1.0), np.float32(0.0))
+classification_success_percent                = T.cast(T.sum(chunks_gotten_right), 'float32') / y_flat.shape[0] * np.float32(100.0)
+classification_success_percent.name           = 'classification_success_percent'
+character_classification_success_percent      = T.sum(chunks_gotten_right * characters) / T.sum(characters) * np.float32(100.0)
+character_classification_success_percent.name = 'character_classification_success_percent'
 
-with open('training_set/sample_0.pickle', 'r') as f:
-    chunks, targets = cPickle.load(f)
+cg = blgraph.ComputationGraph(cost)
 
-rnn = RNN(chunks, targets)
+algorithm = blalg.GradientDescent(
+    cost=cost,
+    parameters=cg.parameters,
+    step_rule=blalg.Adam()
+)
 
-i = 0
-loss, errchrs = rnn.loss()
-while True:
-    #prev_loss = loss
-    rnn.improve()
-    loss, errchrs = rnn.loss()
-    i += 1
-    #if loss < 0.01 and i % 100 == 0:
-    #    print "Saving network..."
-    #    with open('sample_0_overtrain.pickle', 'w') as f:
-    #        cPickle.dump(rnn.get_params(), f)
+test_monitor = blmon.DataStreamMonitoring(
+    variables=[
+        cost,
+        classification_success_percent,
+        character_classification_success_percent
+    ],
+    data_stream=stream_test,
+    prefix='test'
+)
 
-    #print i, errchrs, loss, np.sum(rnn.params[0].get_value()**2), np.sum(rnn.params[2].get_value()**2), np.sum(rnn.params[4].get_value()**2)
-    print i, errchrs, loss
-    #theano.printing.pydotprint(rnn.improvef, "graph_improvef.png")
-    #theano.printing.pydotprint(rnn.lossf, "graph_lossf.png")
+train_monitor = blmon.TrainingDataMonitoring(
+    variables=[
+        cost,
+        classification_success_percent,
+        character_classification_success_percent
+    ],
+    prefix='train',
+    after_epoch=True
+)
 
-    #if prev_loss <= loss:
-    #    old_lr = rnn.lr.get_value()
-    #    new_lr = np.float32(old_lr * 0.8)
-    #    print "Whoops, setting lr: %f -> %f" % (old_lr, new_lr)
-    #    rnn.lr.set_value(new_lr)
-    if i >= 10:
-        break
+main_loop = blml.MainLoop(algorithm, stream_train,
+    extensions=[
+        test_monitor,
+        train_monitor,
+        blext.FinishAfter(after_n_epochs=10000),
+        blext.Printing(),
+        blext.ProgressBar()
+    ]
+)  
+
+main_loop.run()
+

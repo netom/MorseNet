@@ -30,6 +30,8 @@ from collections import OrderedDict
 
 import scipy.io.wavfile
 
+#import matplotlib.pyplot as plt
+
 N_CLASSES  = len(MORSE_CHR)
 
 #
@@ -45,15 +47,20 @@ def get_datastream(offset, num_batches):
     for i in xrange(num_batches):
         dirname = TRAINING_SET_DIR + '/%04d' % (offset + i)
         seq_length = int(open(dirname + '/config.txt').read().strip())
-        x_b = np.zeros(((seq_length // CHUNK) + 1, BATCH_SIZE, CHUNK), dtype=np.float32)
-        y_b = np.zeros((seq_length // CHUNK + 1, BATCH_SIZE), dtype=np.int64)
+        x_b = np.zeros(((seq_length // FFT_SIZE) + 1, BATCH_SIZE, 1), dtype=np.float32)
+        y_b = np.zeros((seq_length // FFT_SIZE + 1, BATCH_SIZE), dtype=np.int64)
         for j in xrange(BATCH_SIZE):
             _, audio = scipy.io.wavfile.read(dirname + '/%03d.wav' % j)
             audio =  (audio / 2**13).astype(np.float32)
 
-            padded_audio = np.pad(audio, (0, CHUNK - (len(audio) % CHUNK)), 'constant', constant_values=(0, 0))
-            reshaped_padded_audio = padded_audio.reshape((len(padded_audio) // CHUNK, CHUNK))
-            x_b[:,j,:] = reshaped_padded_audio
+            padded_audio = np.pad(audio, (0, FFT_SIZE - (len(audio) % FFT_SIZE)), 'constant', constant_values=(0, 0))
+            reshaped_padded_audio = padded_audio.reshape((len(padded_audio) // FFT_SIZE, FFT_SIZE))
+            audio_fft = np.fft.rfft(reshaped_padded_audio)[:,10]
+            audio_fft = audio_fft[:,np.newaxis]
+            x_b[:,j,:] = np.sqrt(audio_fft.real**2 + audio_fft.imag**2)
+
+            #plt.plot(x_b[:,j,:].flatten())
+            #plt.show()
 
             f = open(dirname + '/%03d.txt' % j, 'r')
             lines = map(lambda line: line.split(','), filter(lambda line: line != '', map(lambda line: line.rstrip(), f.readlines())))
@@ -61,7 +68,7 @@ def get_datastream(offset, num_batches):
             f.close()
 
             for char in chars:
-                y_b[char[1] * FRAMERATE // CHUNK][j] = char[0]
+                y_b[char[1] * FRAMERATE // FFT_SIZE][j] = char[0]
 
         sys.stdout.write("\rLoaded %d... " % (i+1))
         sys.stdout.flush()
@@ -73,15 +80,15 @@ def get_datastream(offset, num_batches):
 
     return DataStream(dataset=IterableDataset(OrderedDict([('x', x), ('y', y)])))
 
-stream_train = get_datastream(0, 80)
-stream_test  = get_datastream(80, 20)
+stream_train = get_datastream(0, 20)
+stream_test  = get_datastream(20, 20)
 
 x = T.ftensor3('x')
 y = T.lmatrix('y')
 
 input_layer = br.MLP(
-    activations=[br.Rectifier()],
-    dims=[CHUNK, CHUNK*4],
+    activations=[br.Rectifier()] * 3,
+    dims=[1, 8, 32, 32*4],
     name='input_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
@@ -89,24 +96,44 @@ input_layer = br.MLP(
 input_layer_app = input_layer.apply(x)
 input_layer.initialize()
 
-middle_layer = brrec.LSTM(
-    dim=CHUNK,
+lstm1_layer = brrec.LSTM(
+    dim=32,
     activation=br.Tanh(),
-    name='lstm',
+    name='lstm1',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
 )
-middle_layer_h, middle_layer_c = middle_layer.apply(input_layer_app)
-middle_layer.initialize()
+lstm1_layer_h, lstm1_layer_c = lstm1_layer.apply(input_layer_app)
+lstm1_layer.initialize()
 
-output_layer = input_layer = br.MLP(
-    activations=[br.Rectifier(), None],
-    dims=[CHUNK, CHUNK // 2, N_CLASSES],
+transfer_layer = br.Linear(
+    input_dim=32,
+    output_dim=32*4,
+    name='transfer_layer',
+    weights_init=blinit.IsotropicGaussian(0.01),
+    biases_init=blinit.Constant(0)
+)
+transfer_layer_app = transfer_layer.apply(lstm1_layer_h)
+transfer_layer.initialize()
+
+lstm2_layer = brrec.LSTM(
+    dim=32,
+    activation=br.Tanh(),
+    name='lstm2',
+    weights_init=blinit.IsotropicGaussian(0.01),
+    biases_init=blinit.Constant(0)
+)
+lstm2_layer_h, lstm2_layer_c = lstm2_layer.apply(transfer_layer_app)
+lstm2_layer.initialize()
+
+output_layer = br.Linear(
+    input_dim=32,
+    output_dim=N_CLASSES,
     name='output_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
 )
-output_layer_app = output_layer.apply(middle_layer_h)
+output_layer_app = output_layer.apply(lstm2_layer_h)
 output_layer.initialize()
 
 y_hat_flat = br.Softmax().apply(output_layer_app.reshape((output_layer_app.shape[0]*output_layer_app.shape[1], output_layer_app.shape[2])))

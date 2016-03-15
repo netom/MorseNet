@@ -8,13 +8,13 @@ FRAMERATE = 8000
 FFT_SIZE = 128 # 62.5Hz wide bins
 
 # Size of buffer processed by the neural network in a single step
-CHUNK = 128
+CHUNK = 256
 
 # The number of batches to generate
 NUM_BATCHES = 1000
 
 # The size of a batch
-BATCH_SIZE = 50
+BATCH_SIZE = 30
 
 # The size of a sample in chunks (10 seconds)
 MIN_SEQ_LENGTH = FRAMERATE * 10

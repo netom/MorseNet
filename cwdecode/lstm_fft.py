@@ -80,15 +80,15 @@ def get_datastream(offset, num_batches):
 
     return DataStream(dataset=IterableDataset(OrderedDict([('x', x), ('y', y)])))
 
-stream_train = get_datastream(0, 80)
-stream_test  = get_datastream(80, 20)
+stream_train = get_datastream(0,  10)
+stream_test  = get_datastream(10, 10)
 
 x = T.ftensor3('x')
 y = T.lmatrix('y')
 
 input_layer = br.MLP(
     activations=[br.Rectifier(), br.Rectifier()],
-    dims=[1, 64, 128*4],
+    dims=[1, 128, 128*4],
     name='input_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
@@ -106,9 +106,9 @@ middle_layer = brrec.LSTM(
 middle_layer_h, middle_layer_c = middle_layer.apply(input_layer_app)
 middle_layer.initialize()
 
-output_layer = br.Linear(
-    input_dim=128,
-    output_dim=N_CLASSES,
+output_layer = br.MLP(
+    activations=[br.Rectifier(), None],
+    dims=[128, 64, N_CLASSES],
     name='output_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)

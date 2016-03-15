@@ -79,10 +79,10 @@ def get_onoff_data(c, wpm, deviation, ):
     return (pairs, length)
 
 def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
-    wpm        = random.uniform(5.0, 50.0)
-    deviation  = random.uniform(0.0, 0.15)
+    wpm        = random.uniform(10, 40.0)
+    deviation  = random.uniform(0.0, 0.1)
     wnvol      = random.uniform(0.0, 0.5)
-    qsbvol     = random.uniform(0.0, 0.8)
+    qsbvol     = random.uniform(0.0, 0.7)
     qsbf       = random.uniform(0.1, 0.7)
     sigvol     = random.uniform(0.3, 1.0)
 
