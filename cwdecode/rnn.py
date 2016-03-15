@@ -73,15 +73,15 @@ def get_datastream(offset, num_batches):
 
     return DataStream(dataset=IterableDataset(OrderedDict([('x', x), ('y', y)])))
 
-stream_train = get_datastream(0, 5)
-stream_test  = get_datastream(5, 5)
+stream_train = get_datastream(0,   500)
+stream_test  = get_datastream(500, 100)
 
 x = T.ftensor3('x')
 y = T.lmatrix('y')
 
 input_layer = br.MLP(
     activations=[br.Rectifier()],
-    dims=[CHUNK, CHUNK],
+    dims=[CHUNK, 128],
     name='input_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
@@ -90,7 +90,7 @@ input_layer_app = input_layer.apply(x)
 input_layer.initialize()
 
 recurrent_layer = brrec.SimpleRecurrent(
-    dim=CHUNK,
+    dim=128,
     activation=br.Rectifier(),
     name='rnn',
     weights_init=blinit.IsotropicGaussian(0.01),
@@ -100,8 +100,8 @@ recurrent_layer_app = recurrent_layer.apply(input_layer_app)
 recurrent_layer.initialize()
 
 output_layer = input_layer = br.MLP(
-    activations=[None],
-    dims=[CHUNK, N_CLASSES],
+    activations=[br.Rectifier(), None],
+    dims=[128, 64, N_CLASSES],
     name='output_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
