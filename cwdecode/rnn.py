@@ -61,7 +61,8 @@ def get_datastream(offset, num_batches):
             f.close()
 
             for char in chars:
-                y_b[char[1] * FRAMERATE // CHUNK][j] = char[0]
+                # +1 to correct for the delay in the recurrent unit
+                y_b[char[1] * FRAMERATE // CHUNK + 1][j] = char[0]
 
         sys.stdout.write("\rLoaded %d... " % (i+1))
         sys.stdout.flush()
@@ -73,37 +74,37 @@ def get_datastream(offset, num_batches):
 
     return DataStream(dataset=IterableDataset(OrderedDict([('x', x), ('y', y)])))
 
-stream_train = get_datastream(0,   50)
-stream_test  = get_datastream(50, 10)
+stream_train = get_datastream(0,   500)
+stream_test  = get_datastream(500, 100)
 
 x = T.ftensor3('x')
 y = T.lmatrix('y')
 
 input_layer = br.MLP(
-    activations=[br.Rectifier()],
-    dims=[CHUNK, 128],
+    activations=[br.Rectifier()] * 2,
+    dims=[CHUNK, 64, 64],
     name='input_layer',
-    weights_init=blinit.Orthogonal(),
+    weights_init=blinit.Orthogonal(0.9),
     biases_init=blinit.Constant(0.0)
 )
 input_layer_app = input_layer.apply(x)
 input_layer.initialize()
 
 recurrent_layer = brrec.SimpleRecurrent(
-    dim=128,
+    dim=64,
     activation=br.Rectifier(),
     name='rnn',
-    weights_init=blinit.Orthogonal(0.5),
+    weights_init=blinit.Orthogonal(0.01),
     biases_init=blinit.Constant(0.0)
 )
 recurrent_layer_app = recurrent_layer.apply(input_layer_app)
 recurrent_layer.initialize()
 
 output_layer = input_layer = br.MLP(
-    activations=[br.Rectifier(), None],
-    dims=[128, 64, N_CLASSES],
+    activations=[br.Rectifier()] * 1 + [None],
+    dims=[64, 64, N_CLASSES],
     name='output_layer',
-    weights_init=blinit.Orthogonal(),
+    weights_init=blinit.Orthogonal(0.9),
     biases_init=blinit.Constant(0.0)
 )
 output_layer_app = output_layer.apply(recurrent_layer_app)

@@ -105,7 +105,8 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
         pairs, length = get_onoff_data(c, wpm, deviation)
 
         # Check if it's too long to fit
-        if i + length >= seq_length:
+        # Leave some space on the right
+        if i + length >= seq_length - 1000:
             break
 
         # Write it into the audio data array
