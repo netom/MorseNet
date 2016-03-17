@@ -131,7 +131,7 @@ cg = blgraph.ComputationGraph(cost)
 algorithm = blalg.GradientDescent(
     cost=cost,
     parameters=cg.parameters,
-    step_rule=blalg.Adam() # TODO: look at code, default parameters are suspicious
+    step_rule=blalg.Adam(learning_rate=0.0002) # TODO: look at code, default parameters are suspicious
 )
 
 test_monitor = blmon.DataStreamMonitoring(
