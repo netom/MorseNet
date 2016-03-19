@@ -124,7 +124,7 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     # TODO: QRM
     return ((
         audio * sigvol
-        * np.sin(np.arange(0, seq_length) * 625 * 2 * np.pi / framerate, dtype=np.float32) # Baseband signal
+        * np.sin(np.arange(0, seq_length) * (random.random() * 200 + 500) * 2 * np.pi / framerate, dtype=np.float32) # Baseband signal
         * qsb(seq_length, qsbvol, qsbf)
         + whitenoise(seq_length, wnvol)
         + impulsenoise(seq_length, 4.2)

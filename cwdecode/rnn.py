@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
-# See architecture.md
-
 import sys
 import wave
 import theano
@@ -10,6 +8,8 @@ import cPickle
 import numpy as np
 from config import *
 import theano.tensor as T
+
+import extensions
 
 import blocks as bl
 import blocks.bricks as br
@@ -131,7 +131,7 @@ cg = blgraph.ComputationGraph(cost)
 algorithm = blalg.GradientDescent(
     cost=cost,
     parameters=cg.parameters,
-    step_rule=blalg.Adam(learning_rate=0.0002) # TODO: look at code, default parameters are suspicious
+    step_rule=blalg.Adam(learning_rate=0.0005) # TODO: look at code, default parameters are suspicious
 )
 
 test_monitor = blmon.DataStreamMonitoring(
