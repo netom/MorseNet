@@ -81,7 +81,7 @@ y = T.lmatrix('y')
 
 input_layer = br.MLP(
     activations=[br.Rectifier()],
-    dims=[CHUNK, CHUNK*4],
+    dims=[CHUNK, 256, 256],
     name='input_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
@@ -90,7 +90,7 @@ input_layer_app = input_layer.apply(x)
 input_layer.initialize()
 
 middle_layer = brrec.LSTM(
-    dim=CHUNK,
+    dim=64,
     activation=br.Tanh(),
     name='lstm',
     weights_init=blinit.IsotropicGaussian(0.01),
@@ -101,7 +101,7 @@ middle_layer.initialize()
 
 output_layer = input_layer = br.MLP(
     activations=[br.Rectifier(), None],
-    dims=[CHUNK, CHUNK // 2, N_CLASSES],
+    dims=[64, 64, N_CLASSES],
     name='output_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)

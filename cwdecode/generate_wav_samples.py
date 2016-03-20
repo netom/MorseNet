@@ -79,12 +79,13 @@ def get_onoff_data(c, wpm, deviation, ):
     return (pairs, length)
 
 def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
-    wpm        = random.uniform(10, 40.0)
-    deviation  = random.uniform(0.0, 0.1)
-    wnvol      = random.uniform(0.0, 0.5)
-    qsbvol     = random.uniform(0.0, 0.7)
-    qsbf       = random.uniform(0.1, 0.7)
-    sigvol     = random.uniform(0.3, 1.0)
+    wpm       = random.uniform(10,  40.0)
+    deviation = random.uniform(0.0,  0.1)
+    wnvol     = random.uniform(0.0,  0.5)
+    qsbvol    = random.uniform(0.0,  0.7)
+    qsbf      = random.uniform(0.1,  0.7)
+    sigvol    = random.uniform(0.3,  1.0)
+    vol       = random.uniform(0.01, 1.0)
 
     audio = np.zeros(seq_length, dtype=np.float64)
     characters = []
@@ -128,7 +129,7 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
         * qsb(seq_length, qsbvol, qsbf)
         + whitenoise(seq_length, wnvol)
         + impulsenoise(seq_length, 4.2)
-    ) * 2**13).astype(np.int16), characters
+    ) * 2**13 * vol).astype(np.int16), characters
 
 def save_new_batch(i):
     seq_length = int(random.uniform(MIN_SEQ_LENGTH, MAX_SEQ_LENGTH))

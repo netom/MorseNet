@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
+import os
 import sys
 import wave
 import theano
@@ -74,9 +75,6 @@ def get_datastream(offset, num_batches):
 
     return DataStream(dataset=IterableDataset(OrderedDict([('x', x), ('y', y)])))
 
-stream_train = get_datastream(0,   500)
-stream_test  = get_datastream(500, 100)
-
 x = T.ftensor3('x')
 y = T.lmatrix('y')
 
@@ -93,14 +91,14 @@ input_layer.initialize()
 recurrent_layer = brrec.SimpleRecurrent(
     dim=64,
     activation=br.Rectifier(),
-    name='rnn',
+    name='recurrent_layer',
     weights_init=blinit.Orthogonal(0.01),
     biases_init=blinit.Constant(0.0)
 )
 recurrent_layer_app = recurrent_layer.apply(input_layer_app)
 recurrent_layer.initialize()
 
-output_layer = input_layer = br.MLP(
+output_layer = br.MLP(
     activations=[br.Rectifier()] * 1 + [None],
     dims=[64, 64, N_CLASSES],
     name='output_layer',
@@ -128,10 +126,28 @@ character_classification_success_percent.name = 'character_classification_succes
 
 cg = blgraph.ComputationGraph(cost)
 
+# Load saved model if exists (BUG)
+
+savefname = "saved_params/rnn.pickle"
+if os.path.exists(savefname):
+    print "\n*** *** *** R E S U M I N G   T R A I N I N G *** *** ***\n\n"
+    with open(savefname, "r") as f:
+        values = cPickle.load(f)
+
+    parameters = extensions.get_parameters([input_layer, recurrent_layer, output_layer])
+
+    for parameter_name in values:
+        parameters[parameter_name].set_value(values[parameter_name])
+
+# Load training data
+
+stream_train = get_datastream(0,   500)
+stream_test  = get_datastream(500, 100)
+
 algorithm = blalg.GradientDescent(
     cost=cost,
     parameters=cg.parameters,
-    step_rule=blalg.Adam(learning_rate=0.0005) # TODO: look at code, default parameters are suspicious
+    step_rule=blalg.Adam(learning_rate=0.002) # TODO: look at code, default parameters are suspicious
 )
 
 test_monitor = blmon.DataStreamMonitoring(
@@ -160,9 +176,9 @@ main_loop = blml.MainLoop(algorithm, stream_train,
         train_monitor,
         blext.FinishAfter(after_n_epochs=10000),
         blext.Printing(),
-        blext.ProgressBar()
+        blext.ProgressBar(),
+        extensions.SaveBestModel([input_layer, recurrent_layer, output_layer])
     ]
 )  
 
 main_loop.run()
-
