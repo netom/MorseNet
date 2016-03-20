@@ -147,7 +147,7 @@ stream_test  = get_datastream(500, 100)
 algorithm = blalg.GradientDescent(
     cost=cost,
     parameters=cg.parameters,
-    step_rule=blalg.Adam(learning_rate=0.002) # TODO: look at code, default parameters are suspicious
+    step_rule=blalg.Adam(learning_rate=0.0005)
 )
 
 test_monitor = blmon.DataStreamMonitoring(

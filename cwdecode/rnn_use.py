@@ -93,7 +93,7 @@ stream = p.open(
 
 next_state = numpy.zeros((1, 1,64), numpy.float32)
 while True:
-    chunk = numpy.fromstring(stream.read(CHUNK), dtype=numpy.float32)*50
+    chunk = numpy.fromstring(stream.read(CHUNK), dtype=numpy.float32)*60
     #print max(chunk), min(chunk)
     prediction, next_state = f(numpy.array([[chunk]], dtype=numpy.float32), next_state[0])
     if prediction == 0:
