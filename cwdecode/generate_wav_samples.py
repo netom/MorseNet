@@ -85,6 +85,7 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     qsbvol    = random.uniform(0.0,  0.7)
     qsbf      = random.uniform(0.1,  0.7)
     sigvol    = random.uniform(0.3,  1.0)
+    phase     = random.uniform(0.0,  10000.0)
     vol       = random.uniform(0.01, 1.0)
 
     audio = np.zeros(seq_length, dtype=np.float64)
@@ -124,8 +125,8 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     #
     # TODO: QRM
     return ((
-        audio * sigvol
-        * np.sin(np.arange(0, seq_length) * (random.random() * 200 + 500) * 2 * np.pi / framerate, dtype=np.float32) # Baseband signal
+        sig.convolve(audio, np.array(range(80, 0, -1)) / 3240.0, mode='same') * sigvol
+        * np.sin((np.arange(0, seq_length) + phase) * (random.random() * 200 + 500) * 2 * np.pi / framerate, dtype=np.float32) # Baseband signal
         * qsb(seq_length, qsbvol, qsbf)
         + whitenoise(seq_length, wnvol)
         + impulsenoise(seq_length, 4.2)
