@@ -20,15 +20,16 @@ def get_parameters(bricks):
     return params
 
 class SaveBestModel(SimpleExtension):
-    def __init__(self, bricks, **kwargs):
+    def __init__(self, fname, bricks, **kwargs):
         kwargs.setdefault("after_epoch", True)
         super(SaveBestModel, self).__init__(**kwargs)
         self.bricks = bricks
+        self.fname = fname
 
     def do(self, callback_name, *args):
         parameters = get_parameters(self.bricks)
         parameter_values = {}
         for parameter_name in parameters:
             parameter_values[parameter_name] = parameters[parameter_name].get_value()
-        with open("saved_params/rnn.pickle", "w") as f:
+        with open(self.fname, "w") as f:
             cPickle.dump(parameter_values, f, cPickle.HIGHEST_PROTOCOL)

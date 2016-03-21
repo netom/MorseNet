@@ -177,7 +177,7 @@ main_loop = blml.MainLoop(algorithm, stream_train,
         blext.FinishAfter(after_n_epochs=10000),
         blext.Printing(),
         blext.ProgressBar(),
-        extensions.SaveBestModel([input_layer, recurrent_layer, output_layer])
+        extensions.SaveBestModel("saved_params/rnn.pickle", [input_layer, recurrent_layer, output_layer])
     ]
 )  
 

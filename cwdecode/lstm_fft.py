@@ -87,8 +87,8 @@ x = T.ftensor3('x')
 y = T.lmatrix('y')
 
 input_layer = br.MLP(
-    activations=[br.Rectifier(), br.Rectifier()],
-    dims=[1, 128, 128*4],
+    activations=[br.Rectifier()],
+    dims=[1, 64],
     name='input_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
@@ -97,7 +97,7 @@ input_layer_app = input_layer.apply(x)
 input_layer.initialize()
 
 middle_layer = brrec.LSTM(
-    dim=128,
+    dim=64,
     activation=br.Tanh(),
     name='lstm',
     weights_init=blinit.IsotropicGaussian(0.01),
@@ -108,7 +108,7 @@ middle_layer.initialize()
 
 output_layer = br.MLP(
     activations=[br.Rectifier(), None],
-    dims=[128, 64, N_CLASSES],
+    dims=[64, N_CLASSES],
     name='output_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)

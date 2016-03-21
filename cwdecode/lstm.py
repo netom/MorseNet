@@ -3,6 +3,7 @@
 
 # See architecture.md
 
+import os
 import sys
 import wave
 import theano
@@ -10,6 +11,7 @@ import cPickle
 import numpy as np
 from config import *
 import theano.tensor as T
+import extensions
 
 import blocks as bl
 import blocks.bricks as br
@@ -73,14 +75,14 @@ def get_datastream(offset, num_batches):
 
     return DataStream(dataset=IterableDataset(OrderedDict([('x', x), ('y', y)])))
 
-stream_train = get_datastream(0, 80)
-stream_test  = get_datastream(80, 20)
+stream_train = get_datastream(0,   500)
+stream_test  = get_datastream(500, 100)
 
 x = T.ftensor3('x')
 y = T.lmatrix('y')
 
 input_layer = br.MLP(
-    activations=[br.Rectifier()],
+    activations=[br.Rectifier(), br.Rectifier()],
     dims=[CHUNK, 256, 256],
     name='input_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
@@ -89,24 +91,24 @@ input_layer = br.MLP(
 input_layer_app = input_layer.apply(x)
 input_layer.initialize()
 
-middle_layer = brrec.LSTM(
+recurrent_layer = brrec.LSTM(
     dim=64,
     activation=br.Tanh(),
-    name='lstm',
+    name='recurrent_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
 )
-middle_layer_h, middle_layer_c = middle_layer.apply(input_layer_app)
-middle_layer.initialize()
+recurrent_layer_h, recurrent_layer_c = recurrent_layer.apply(input_layer_app)
+recurrent_layer.initialize()
 
-output_layer = input_layer = br.MLP(
+output_layer = br.MLP(
     activations=[br.Rectifier(), None],
     dims=[64, 64, N_CLASSES],
     name='output_layer',
     weights_init=blinit.IsotropicGaussian(0.01),
     biases_init=blinit.Constant(0)
 )
-output_layer_app = output_layer.apply(middle_layer_h)
+output_layer_app = output_layer.apply(recurrent_layer_h)
 output_layer.initialize()
 
 y_hat_flat = br.Softmax().apply(output_layer_app.reshape((output_layer_app.shape[0]*output_layer_app.shape[1], output_layer_app.shape[2])))
@@ -127,10 +129,23 @@ character_classification_success_percent.name = 'character_classification_succes
 
 cg = blgraph.ComputationGraph(cost)
 
+# Load saved model if exists (BUG)
+
+savefname = "saved_params/lstm.pickle"
+if os.path.exists(savefname):
+    print "\n*** *** *** R E S U M I N G   T R A I N I N G *** *** ***\n\n"
+    with open(savefname, "r") as f:
+        values = cPickle.load(f)
+
+    parameters = extensions.get_parameters([input_layer, recurrent_layer, output_layer])
+
+    for parameter_name in values:
+        parameters[parameter_name].set_value(values[parameter_name])
+
 algorithm = blalg.GradientDescent(
     cost=cost,
     parameters=cg.parameters,
-    step_rule=blalg.Adam()
+    step_rule=blalg.Adam(learning_rate=0.0005)
 )
 
 test_monitor = blmon.DataStreamMonitoring(
@@ -159,7 +174,8 @@ main_loop = blml.MainLoop(algorithm, stream_train,
         train_monitor,
         blext.FinishAfter(after_n_epochs=10000),
         blext.Printing(),
-        blext.ProgressBar()
+        blext.ProgressBar(),
+        extensions.SaveBestModel("saved_params/lstm.pickle", [input_layer, recurrent_layer, output_layer])
     ]
 )  
 
