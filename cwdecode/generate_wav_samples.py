@@ -93,6 +93,7 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
 
     padl = int(max(0, random.normalvariate(1, 0.5)) * framerate) # Padding at the beginning
     i = padl # The actual index in the samlpes
+    s_pairs, s_length = get_onoff_data(' ', wpm, deviation)
     c = ' '
     while True:
         prev_c = c
@@ -108,7 +109,12 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
 
         # Check if it's too long to fit
         # Leave some space on the right
-        if i + length >= seq_length - 1000:
+        # Always insert a space after the sequence
+        if i + length + s_length + 1000 >= seq_length:
+            for p in s_pairs:
+                audio[i:i+p[1]] = p[0]
+                i += p[1]
+            characters.append((' ', i / float(framerate)))
             break
 
         # Write it into the audio data array
