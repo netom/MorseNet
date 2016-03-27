@@ -86,17 +86,28 @@ def get_onoff_data(c, wpm, deviation, ):
     return (pairs, length)
 
 def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
+    # Words per minute
     wpm       = random.uniform(10,  40.0)
+    # Error in timing
     deviation = random.uniform(0.0,  0.1)
-    wnvol     = random.uniform(0.0,  0.5)
+    # TODO: dit / dah / space weights
+    # White noise volime
+    wnvol     = random.uniform(0.1,  0.4)
+    # QSB volume: 0=no qsb, 1: full silencing QSB
     qsbvol    = random.uniform(0.0,  0.7)
+    # QSB frequency in Hertz
     qsbf      = random.uniform(0.1,  0.7)
-    sigvol    = random.uniform(0.3,  1.0)
-    phase     = random.uniform(0.0,  10000.0)
-    vol       = random.uniform(0.01, 1.0)
+    # Signal volume
+    sigvol    = random.uniform(0.15,  0.5)
+    # Signal frequency
     sigf      = random.uniform(500.0, 700.0)
+    # Signal phase
+    phase     = random.uniform(0.0,  framerate / sigf)
+    # Filter lower cutoff
     f1        = random.uniform(sigf - 400, sigf-50)
+    # Filter higher cutoff
     f2        = random.uniform(sigf + 50, sigf + 400)
+    # Number of taps in the filter
     taps      = 63 # The number of taps of the FIR filter
 
     audio = np.zeros(seq_length, dtype=np.float64)
@@ -140,14 +151,27 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     fil_bandreject = fil_lowpass+fil_highpass
     fil_bandpass = spectinvert(fil_bandreject)
 
-    # TODO: QRM
-    return scipy.signal.lfilter(fil_bandpass, 1.0, (
-        sig.convolve(audio, np.array(range(80, 0, -1)) / 3240.0, mode='same') * sigvol
-        * np.sin((np.arange(0, seq_length) + phase) * sigf * 2 * np.pi / framerate, dtype=np.float32) # Baseband signal
-        * qsb(seq_length, qsbvol, qsbf)
-        + whitenoise(seq_length, wnvol)
-        + impulsenoise(seq_length, 4.2)
-    ) * 2**13 * vol).astype(np.int16), characters
+    # Remove clicks
+    s = sig.convolve(audio, np.array(range(80, 0, -1)) / 3240.0, mode='same') * sigvol
+    # Sinewave with phase shift (cw signal)
+    s *= np.sin((np.arange(0, seq_length) + phase) * sigf * 2 * np.pi / framerate)
+    # QSB
+    s *= qsb(seq_length, qsbvol, qsbf)
+    # Add white noise
+    s += whitenoise(seq_length, wnvol)
+    # Add impulse noise
+    s += impulsenoise(seq_length, 4.2)
+    # Filter signal
+    s = scipy.signal.lfilter(fil_bandpass, 1.0, s)
+    # TODO: AGC
+    # TODO: QRN
+    # Scale and convert to int
+    s = (s * 2**14).astype(np.int16)
+
+    # TODO: check for clipping
+    #print np.max(np.abs(s))
+
+    return s, characters
 
 def save_new_batch(i):
     seq_length = int(random.uniform(MIN_SEQ_LENGTH, MAX_SEQ_LENGTH))
