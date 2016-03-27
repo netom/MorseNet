@@ -10,9 +10,16 @@ import random
 import cPickle
 import matplotlib.pyplot as plt
 import scipy.io.wavfile
+import scipy.signal
 
 from config import *
 
+# Spectral inversion for FIR filters
+def spectinvert(taps):
+    l = len(taps)
+    return ([0]*(l/2) + [1] + [0]*(l/2)) - taps
+
+# Returns the dit length in secods from the WPM
 def wpm2dit(wpm):
     return 1.2 / wpm
 
@@ -87,6 +94,10 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     sigvol    = random.uniform(0.3,  1.0)
     phase     = random.uniform(0.0,  10000.0)
     vol       = random.uniform(0.01, 1.0)
+    sigf      = random.uniform(500.0, 700.0)
+    f1        = random.uniform(sigf - 400, sigf-50)
+    f2        = random.uniform(sigf + 50, sigf + 400)
+    taps      = 63 # The number of taps of the FIR filter
 
     audio = np.zeros(seq_length, dtype=np.float64)
     characters = []
@@ -123,16 +134,16 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
             i += p[1]
         characters.append((c, i / float(framerate)))
 
-    # TODO: filter for clicks (random filter between 1KHz - 50Hz)
-    #
-    # Something like this:
-    # h=scipy.signal.firwin( numtaps=N, cutoff=40, nyq=Fs/2)
-    # y=scipy.signal.lfilter( h, 1.0, x)
-    #
+    # Set up the bandpass filter
+    fil_lowpass = scipy.signal.firwin(taps, f1/(framerate/2))
+    fil_highpass = spectinvert(scipy.signal.firwin(taps, f2/(framerate/2)))
+    fil_bandreject = fil_lowpass+fil_highpass
+    fil_bandpass = spectinvert(fil_bandreject)
+
     # TODO: QRM
-    return ((
+    return scipy.signal.lfilter(fil_bandpass, 1.0, (
         sig.convolve(audio, np.array(range(80, 0, -1)) / 3240.0, mode='same') * sigvol
-        * np.sin((np.arange(0, seq_length) + phase) * (random.random() * 200 + 500) * 2 * np.pi / framerate, dtype=np.float32) # Baseband signal
+        * np.sin((np.arange(0, seq_length) + phase) * sigf * 2 * np.pi / framerate, dtype=np.float32) # Baseband signal
         * qsb(seq_length, qsbvol, qsbf)
         + whitenoise(seq_length, wnvol)
         + impulsenoise(seq_length, 4.2)
