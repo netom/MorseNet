@@ -166,12 +166,19 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     # AGC with fast attack and slow exponential decay
     a = 0.02  # Attack. The closer to 0 the slower.
     d = 0.002 # Decay. The closer to 0 the slower.
-    x = 1.0   # Correction factor 
+    agc_coeff = 1.0   # Correction factor 
     for k in range(len(s)):
-        p = (s[k] / x)**2
-        x = max(x + (p - x) * d, x + (p - x) * a)
-        s[k] /= x / 1.4142 # I don't know why is this necessary. TODO: figure it out
-    #print np.average(s), sum(s**2) / len(s), max(s), min(s) # Debug mean, variance, max, min
+        s[k] *= agc_coeff
+        err = s[k]**2 - 1.0
+        if err >= 0:
+            # Level is too high
+            agc_coeff -= abs(err * a)
+        else:
+            # Level is too low
+            agc_coeff += abs(err * d)
+    s *= 1.56
+    #print np.average(s), np.average(s**2), max(s), min(s) # Debug mean, variance, max, min
+    #exit()
     # TODO: QRN
     # Scale and convert to int
     s = (s * 2**12).astype(np.int16)
