@@ -51,7 +51,7 @@ def get_datastream(offset, num_batches):
         y_b = np.zeros((seq_length // FFT_SIZE + 1, BATCH_SIZE), dtype=np.int64)
         for j in xrange(BATCH_SIZE):
             _, audio = scipy.io.wavfile.read(dirname + '/%03d.wav' % j)
-            audio =  (audio / 2**13).astype(np.float32)
+            audio =  (audio / 2**12).astype(np.float32)
 
             padded_audio = np.pad(audio, (0, FFT_SIZE - (len(audio) % FFT_SIZE)), 'constant', constant_values=(0, 0))
             reshaped_padded_audio = padded_audio.reshape((len(padded_audio) // FFT_SIZE, FFT_SIZE))

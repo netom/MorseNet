@@ -92,13 +92,13 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     deviation = random.uniform(0.0,  0.1)
     # TODO: dit / dah / space weights
     # White noise volime
-    wnvol     = random.uniform(0.1,  0.4)
+    wnvol     = random.uniform(0.5,  3.0)
     # QSB volume: 0=no qsb, 1: full silencing QSB
     qsbvol    = random.uniform(0.0,  0.7)
     # QSB frequency in Hertz
     qsbf      = random.uniform(0.1,  0.7)
     # Signal volume
-    sigvol    = random.uniform(0.15,  0.5)
+    sigvol    = random.uniform(1.0,  3.3)
     # Signal frequency
     sigf      = random.uniform(500.0, 700.0)
     # Signal phase
@@ -163,13 +163,18 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     s += impulsenoise(seq_length, 4.2)
     # Filter signal
     s = scipy.signal.lfilter(fil_bandpass, 1.0, s)
-    # TODO: AGC
+    # AGC with fast attack and slow exponential decay
+    a = 0.02  # Attack. The closer to 0 the slower.
+    d = 0.002 # Decay. The closer to 0 the slower.
+    x = 1.0   # Correction factor 
+    for k in xrange(len(s)):
+        p = (s[k] / x)**2
+        x = max(x + (p - x) * d, x + (p - x) * a)
+        s[k] /= x / 1.4142 # I don't know why is this necessary. TODO: figure it out
+    #print np.average(s), sum(s**2) / len(s), max(s), min(s) # Debug mean, variance, max, min
     # TODO: QRN
     # Scale and convert to int
-    s = (s * 2**14).astype(np.int16)
-
-    # TODO: check for clipping
-    #print np.max(np.abs(s))
+    s = (s * 2**12).astype(np.int16)
 
     return s, characters
 

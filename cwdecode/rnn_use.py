@@ -93,9 +93,17 @@ stream = p.open(
 
 next_state = numpy.zeros((1, 1,64), numpy.float32)
 while True:
-    chunk = numpy.fromstring(stream.read(CHUNK), dtype=numpy.float32)*100
-    #print max(chunk), min(chunk)
-    prediction, next_state = f(numpy.array([[chunk]], dtype=numpy.float32), next_state[0])
+    s = numpy.fromstring(stream.read(CHUNK), dtype=numpy.float32)
+    # AGC with fast attack and slow exponential decay
+    a = 0.02  # Attack. The closer to 0 the slower.
+    d = 0.002 # Decay. The closer to 0 the slower.
+    x = 1.0   # Correction factor 
+    for k in xrange(len(s)):
+        p = (s[k] / x)**2
+        x = max(x + (p - x) * d, x + (p - x) * a)
+        s[k] /= x / 1.4142 # I don't know why is this necessary. TODO: figure it out
+    #print max(s), min(s)
+    prediction, next_state = f(numpy.array([[s]], dtype=numpy.float32), next_state[0])
     if prediction == 0:
         continue
     c = MORSE_CHR[prediction]
