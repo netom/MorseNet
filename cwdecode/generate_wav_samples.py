@@ -100,13 +100,13 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     # Signal volume
     sigvol    = random.uniform(1.0,  3.3)
     # Signal frequency
-    sigf      = random.uniform(500.0, 700.0)
+    sigf      = random.uniform(590.0, 610.0)
     # Signal phase
     phase     = random.uniform(0.0,  framerate / sigf)
     # Filter lower cutoff
-    f1        = random.uniform(sigf - 400, sigf-50)
+    f1        = random.uniform(sigf - 220, sigf - 180)
     # Filter higher cutoff
-    f2        = random.uniform(sigf + 50, sigf + 400)
+    f2        = random.uniform(sigf + 180, sigf + 220)
     # Number of taps in the filter
     taps      = 63 # The number of taps of the FIR filter
 
@@ -164,19 +164,21 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     # Filter signal
     s = scipy.signal.lfilter(fil_bandpass, 1.0, s)
     # AGC with fast attack and slow exponential decay
-    a = 0.02  # Attack. The closer to 0 the slower.
-    d = 0.002 # Decay. The closer to 0 the slower.
-    agc_coeff = 1.0   # Correction factor 
-    for k in range(len(s)):
-        s[k] *= agc_coeff
-        err = s[k]**2 - 1.0
-        if err >= 0:
-            # Level is too high
-            agc_coeff -= abs(err * a)
-        else:
-            # Level is too low
-            agc_coeff += abs(err * d)
-    s *= 1.56
+    #a = 0.02  # Attack. The closer to 0 the slower.
+    #d = 0.002 # Decay. The closer to 0 the slower.
+    #agc_coeff = 1.0   # Correction factor 
+    #for k in range(len(s)):
+    #    s[k] *= agc_coeff
+    #    err = s[k]**2 - 1.0
+    #    if err >= 0:
+    #        # Level is too high
+    #        agc_coeff -= abs(err * a)
+    #    else:
+    #        # Level is too low
+    #        agc_coeff += abs(err * d)
+    #s *= 1.56
+
+    s /= np.sqrt(np.average(s**2))
     #print np.average(s), np.average(s**2), max(s), min(s) # Debug mean, variance, max, min
     #exit()
     # TODO: QRN

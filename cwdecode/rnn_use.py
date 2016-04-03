@@ -37,7 +37,7 @@ x = T.ftensor3('x')
 
 input_layer = br.MLP(
     activations=[br.Rectifier()] * 2,
-    dims=[CHUNK, 64, 64],
+    dims=[CHUNK, 128, 128],
     name='input_layer',
     weights_init=blinit.Orthogonal(0.9),
     biases_init=blinit.Constant(0.0)
@@ -46,7 +46,7 @@ input_layer_app = input_layer.apply(x)
 input_layer.initialize()
 
 recurrent_layer = brrec.SimpleRecurrent(
-    dim=64,
+    dim=128,
     activation=br.Rectifier(),
     name='recurrent_layer',
     weights_init=blinit.Orthogonal(0.01),
@@ -58,7 +58,7 @@ recurrent_layer.initialize()
 
 output_layer = br.MLP(
     activations=[br.Rectifier()] * 1 + [None],
-    dims=[64, 64, N_CLASSES],
+    dims=[128, 128, N_CLASSES],
     name='output_layer',
     weights_init=blinit.Orthogonal(0.9),
     biases_init=blinit.Constant(0.0)
@@ -94,7 +94,7 @@ stream = p.open(
 a = 0.02  # Attack. The closer to 0 the slower.
 d = 0.002 # Decay. The closer to 0 the slower.
 agc_coeff = 1.0   # Correction factor 
-next_state = numpy.zeros((1, 1,64), numpy.float32)
+next_state = numpy.zeros((1, 1, 128), numpy.float32)
 while True:
     s = numpy.fromstring(stream.read(CHUNK), dtype=numpy.float32)
     # AGC with fast attack and slow exponential decay

@@ -82,7 +82,7 @@ y = T.lmatrix('y')
 
 input_layer = br.MLP(
     activations=[br.Rectifier()] * 2,
-    dims=[CHUNK, 64, 64],
+    dims=[CHUNK, 128, 128],
     name='input_layer',
     weights_init=blinit.Orthogonal(0.9),
     biases_init=blinit.Constant(0.0)
@@ -91,10 +91,10 @@ input_layer_app = input_layer.apply(x)
 input_layer.initialize()
 
 recurrent_layer = brrec.SimpleRecurrent(
-    dim=64,
+    dim=128,
     activation=br.Rectifier(),
     name='recurrent_layer',
-    weights_init=blinit.Orthogonal(0.01),
+    weights_init=blinit.Orthogonal(0.2),
     biases_init=blinit.Constant(0.0)
 )
 recurrent_layer_app = recurrent_layer.apply(input_layer_app)
@@ -102,7 +102,7 @@ recurrent_layer.initialize()
 
 output_layer = br.MLP(
     activations=[br.Rectifier()] * 1 + [None],
-    dims=[64, 64, N_CLASSES],
+    dims=[128, 128, N_CLASSES],
     name='output_layer',
     weights_init=blinit.Orthogonal(0.9),
     biases_init=blinit.Constant(0.0)
@@ -128,6 +128,10 @@ character_classification_success_percent.name = 'character_classification_succes
 
 cg = blgraph.ComputationGraph(cost)
 
+cg = blgraph.apply_dropout(cg, [x, input_layer_app, recurrent_layer_app], 0.5)
+
+# TODO: implement a noise step
+
 # Load saved model if exists (BUG)
 
 savefname = "saved_params/rnn.pickle"
@@ -149,7 +153,10 @@ stream_test  = get_datastream(8, 2)
 algorithm = blalg.GradientDescent(
     cost=cost,
     parameters=cg.parameters,
-    step_rule=blalg.Adam(learning_rate=0.0005)
+    step_rule=blalg.CompositeRule([
+        blalg.StepClipping(threshold=2.0),
+        blalg.Adam(learning_rate=0.0002)
+    ])
 )
 
 test_monitor = blmon.DataStreamMonitoring(
