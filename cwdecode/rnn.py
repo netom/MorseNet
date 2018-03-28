@@ -147,8 +147,8 @@ if os.path.exists(savefname):
 
 # Load training data
 
-stream_train = get_datastream(0,   8)
-stream_test  = get_datastream(8, 2)
+stream_train = get_datastream(0,   500)
+stream_test  = get_datastream(500, 100)
 
 algorithm = blalg.GradientDescent(
     cost=cost,
