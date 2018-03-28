@@ -11,7 +11,7 @@ FFT_SIZE = 128 # 62.5Hz wide bins
 CHUNK = 256
 
 # The number of batches to generate
-NUM_BATCHES = 600
+NUM_BATCHES = 10
 
 # The size of a batch
 BATCH_SIZE = 35
@@ -28,7 +28,7 @@ MORSE_CHR = ['\0','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P
 
 # Maps a character to it's serial number
 MORSE_ORD = {}
-for i in xrange(len(MORSE_CHR)):
+for i in range(len(MORSE_CHR)):
     MORSE_ORD[MORSE_CHR[i]] = i
 
 # Characters and morse code representations

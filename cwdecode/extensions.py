@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
-import cPickle
+import _pickle as cPickle
 
 from blocks.roles import PARAMETER
 from blocks.extensions import SimpleExtension
@@ -31,5 +31,5 @@ class SaveBestModel(SimpleExtension):
         parameter_values = {}
         for parameter_name in parameters:
             parameter_values[parameter_name] = parameters[parameter_name].get_value()
-        with open(self.fname, "w") as f:
-            cPickle.dump(parameter_values, f, cPickle.HIGHEST_PROTOCOL)
+        with open(self.fname, "wb") as f:
+            cPickle.dump(parameter_values, f)

@@ -7,7 +7,7 @@ import sys
 import numpy as np
 import scipy.signal as sig
 import random
-import _pickle as cPickle
+import cPickle
 import matplotlib.pyplot as plt
 import scipy.io.wavfile
 import scipy.signal
@@ -17,7 +17,7 @@ from config import *
 # Spectral inversion for FIR filters
 def spectinvert(taps):
     l = len(taps)
-    return ([0]*(l//2) + [1] + [0]*(l//2)) - taps
+    return ([0]*(l/2) + [1] + [0]*(l/2)) - taps
 
 # Returns the dit length in secods from the WPM
 def wpm2dit(wpm):
@@ -167,7 +167,7 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     a = 0.02  # Attack. The closer to 0 the slower.
     d = 0.002 # Decay. The closer to 0 the slower.
     x = 1.0   # Correction factor 
-    for k in range(len(s)):
+    for k in xrange(len(s)):
         p = (s[k] / x)**2
         x = max(x + (p - x) * d, x + (p - x) * a)
         s[k] /= x / 1.4142 # I don't know why is this necessary. TODO: figure it out
@@ -185,7 +185,7 @@ def save_new_batch(i):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-    for j in range(BATCH_SIZE):
+    for j in xrange(BATCH_SIZE):
         audio, characters = generate_seq(seq_length)
 
         scipy.io.wavfile.write(dirname + '/%03d.wav' % j, FRAMERATE, audio)
@@ -199,9 +199,9 @@ def save_new_batch(i):
 if not os.path.exists(TRAINING_SET_DIR):
     os.makedirs(TRAINING_SET_DIR)
 
-print("Generating %d batches..." % NUM_BATCHES)
-for i in range(NUM_BATCHES):
+print "Generating %d batches..." % NUM_BATCHES
+for i in xrange(NUM_BATCHES):
     sys.stdout.write("\rGenerating %d... " % i)
     sys.stdout.flush()
     save_new_batch(i)
-print("\ndone.\n")
+print "\ndone.\n"

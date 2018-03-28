@@ -5,7 +5,7 @@ import os
 import sys
 import wave
 import theano
-import _pickle as cPickle
+import cPickle
 import numpy as np
 from config import *
 import theano.tensor as T
@@ -31,8 +31,6 @@ from collections import OrderedDict
 
 import scipy.io.wavfile
 
-import theano.tensor.nnet.ctc # THIS IS THE SHIT!
-
 N_CLASSES  = len(MORSE_CHR)
 
 #
@@ -44,13 +42,13 @@ N_CLASSES  = len(MORSE_CHR)
 def get_datastream(offset, num_batches):
     x = []
     y = []
-    print("Loading %d batches with %d samples each..." % (num_batches, BATCH_SIZE))
-    for i in range(num_batches):
+    print "Loading %d batches with %d samples each..." % (num_batches, BATCH_SIZE)
+    for i in xrange(num_batches):
         dirname = TRAINING_SET_DIR + '/%04d' % (offset + i)
         seq_length = int(open(dirname + '/config.txt').read().strip())
         x_b = np.zeros(((seq_length // CHUNK) + 1, BATCH_SIZE, CHUNK), dtype=np.float32)
         y_b = np.zeros((seq_length // CHUNK + 1, BATCH_SIZE), dtype=np.int64)
-        for j in range(BATCH_SIZE):
+        for j in xrange(BATCH_SIZE):
             _, audio = scipy.io.wavfile.read(dirname + '/%03d.wav' % j)
             audio =  (audio / 2**12).astype(np.float32)
 
@@ -65,7 +63,7 @@ def get_datastream(offset, num_batches):
 
             for char in chars:
                 # +1 to correct for the delay in the recurrent unit
-                y_b[int(char[1] * FRAMERATE // CHUNK + 1)][j] = char[0]
+                y_b[char[1] * FRAMERATE // CHUNK + 1][j] = char[0]
 
         sys.stdout.write("\rLoaded %d... " % (i+1))
         sys.stdout.flush()
@@ -73,7 +71,7 @@ def get_datastream(offset, num_batches):
         x.append(x_b)
         y.append(y_b)
 
-    print("\nDone.\n")
+    print "\nDone.\n"
 
     return DataStream(dataset=IterableDataset(OrderedDict([('x', x), ('y', y)])))
 
@@ -132,8 +130,8 @@ cg = blgraph.ComputationGraph(cost)
 
 savefname = "saved_params/rnn.pickle"
 if os.path.exists(savefname):
-    print("\n*** *** *** R E S U M I N G   T R A I N I N G *** *** ***\n\n")
-    with open(savefname, "rb") as f:
+    print "\n*** *** *** R E S U M I N G   T R A I N I N G *** *** ***\n\n"
+    with open(savefname, "r") as f:
         values = cPickle.load(f)
 
     parameters = extensions.get_parameters([input_layer, recurrent_layer, output_layer])
@@ -143,8 +141,8 @@ if os.path.exists(savefname):
 
 # Load training data
 
-stream_train = get_datastream(0,   8)
-stream_test  = get_datastream(8, 2)
+stream_train = get_datastream(0,   500)
+stream_test  = get_datastream(500, 100)
 
 algorithm = blalg.GradientDescent(
     cost=cost,
