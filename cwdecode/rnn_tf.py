@@ -2,13 +2,14 @@ import tensorflow as tf
 
 import config
 
-#l1 = tf.layers.Dense(128, activation=tf.nn.relu)
-#l2 = tf.layers.Dense(128, activation=tf.nn.relu)
-#l3 = tf.contrib.rnn.BasicRNNCell(128, tf.nn.relu)
-#l4 = tf.layers.Dense(128, activation=tf.nn.relu)
-
 x_ = tf.placeholder(tf.float32, shape=[4,2], name="x-input")
 y_ = tf.placeholder(tf.float32, shape=[4,1], name="y-input")
+
+l1 = tf.layers.Dense(128, activation=tf.nn.relu)
+l2 = tf.layers.Dense(128, activation=tf.nn.relu)
+l3 = tf.contrib.rnn.BasicRNNCell(128, tf.nn.relu)
+l4 = tf.layers.Dense(128, activation=tf.nn.relu)
+l4 = tf.layers.Dense(128, activation=tf.nn.relu)
 
 _ = tf.layers.dense(x_,  2, activation=tf.sigmoid)
 y = tf.layers.dense( _, 1, activation=tf.sigmoid)
