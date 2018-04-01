@@ -42,7 +42,6 @@ target_filename = maybe_download('LDC93S1.txt', 62)
 fs, audio = wav.read(audio_filename)
 
 inputs = mfcc(audio, samplerate=fs)
-
 # Tranform in 3D array
 train_inputs = np.asarray(inputs[np.newaxis, :])
 train_inputs = (train_inputs - np.mean(train_inputs))/np.std(train_inputs)
@@ -65,9 +64,6 @@ targets = np.hstack([SPACE_TOKEN if x == '' else list(x) for x in targets])
 # Transform char into index
 targets = np.asarray([SPACE_INDEX if x == SPACE_TOKEN else ord(x) - FIRST_INDEX
                       for x in targets])
-
-print(targets)
-exit()
 
 # Creating sparse representation to feed the placeholder
 train_targets = sparse_tuple_from([targets])

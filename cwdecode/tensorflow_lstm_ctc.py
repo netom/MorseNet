@@ -27,47 +27,67 @@ def sparse_tuple_from(sequences, dtype=np.int32):
     return indices, values, shape
 
 # Hyper-parameters
-num_epochs = 100
+num_epochs = 200
 num_hidden = 50
+num_units = 50
 num_layers = 1
-batch_size = 1
 initial_learning_rate = 1e-2
 momentum = 0.9
 
-num_examples = 1
+num_examples = 101
+batch_size = 1
 num_batches_per_epoch = int(num_examples/batch_size)
 
-# Loading the data
+# Load the data
 
-audio_filename = 'training_set/0000/000.wav'
-target_filename = 'training_set/0000/000.txt'
+target_filename_tpl = 'training_set/%04d/%03d.txt'
+audio_filename_tpl  = 'training_set/%04d/%03d.wav'
 
-fs, audio = wav.read(audio_filename)
+train_inputs  = []
+train_targets = []
+raw_targets   = []
 
-time_steps = len(audio)//CHUNK
-truncated_autio_length = time_steps * CHUNK
+# Files must be of the same length in one batch
+for i in range(num_batches_per_epoch):
+    audio_filename = audio_filename_tpl % (i // 35, i % 35)
 
-inputs = np.reshape(audio[:truncated_autio_length],  (time_steps, CHUNK))
+    fs, audio = wav.read(audio_filename)
 
-# Tranform in 3D array
-train_inputs = np.asarray(inputs[np.newaxis, :])
-train_inputs = (train_inputs - np.mean(train_inputs))/np.std(train_inputs)
-train_seq_len = [train_inputs.shape[1]]
+    time_steps = len(audio)//CHUNK
+    truncated_autio_length = time_steps * CHUNK
 
-# Readings targets
-with open(target_filename, 'r') as f:
-    targets = list(map(lambda x: x[0], f.readlines()))
+    # Input shape is [num_batches, time_steps, CHUNK (features)]
+    inputs = np.reshape(audio[:truncated_autio_length],  (1, time_steps, CHUNK))
+    inputs = (inputs - np.mean(inputs)) / np.std(inputs)
 
-original = ''.join(targets)
+    train_inputs.append(inputs)
 
-# Transform char into index
-targets = np.asarray([MORSE_CHR.index(x) for x in targets])
+# Convert inputs to numpy array and normalize them
+# This piece of code tries to assemble a batch, but for now it assembles
+# several batches of length of one.
+train_seq_len = [train_inputs[0].shape[1]]
 
-# Creating sparse representation to feed the placeholder
-train_targets = sparse_tuple_from([targets])
+# Read targets
+for i in range(num_batches_per_epoch):
+    target_filename = target_filename_tpl % (i // 35, i % 35)
 
-# We don't have a validation dataset :(
-val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_len
+    with open(target_filename, 'r') as f:
+        targets = list(map(lambda x: x[0], f.readlines()))
+
+    raw_targets.append(''.join(targets))
+
+    # Transform char into index
+    targets = np.asarray([MORSE_CHR.index(x) for x in targets])
+
+    # Creating sparse representation to feed the placeholder
+    train_targets.append(sparse_tuple_from([targets]))
+
+# Build a sparse matrix for training required by the ctc loss function
+#train_targets = sparse_tuple_from(train_targets)
+#train_targets = np.asarray(train_targets)
+
+# Make our validation set to be the 0th one
+val_inputs, val_targets, val_seq_len = train_inputs[0], train_targets[0], train_seq_len
 
 
 # THE MAIN CODE!
@@ -93,7 +113,6 @@ with graph.as_default():
     #   tf.nn.rnn_cell.RNNCell
     #   tf.nn.rnn_cell.GRUCell 
     cells = []
-    num_units = 50
     for _ in range(num_layers):
         cell = tf.contrib.rnn.LSTMCell(num_units)  # Or LSTMCell(num_units)
         cells.append(cell)
@@ -144,15 +163,15 @@ with tf.Session(graph=graph) as session:
     # Initializate the weights and biases
     tf.global_variables_initializer().run()
 
-
     for curr_epoch in range(num_epochs):
         train_cost = train_ler = 0
         start = time.time()
 
-        for batch in range(num_batches_per_epoch):
+        for batch in range(1,num_batches_per_epoch):
 
-            feed = {inputs: train_inputs,
-                    targets: train_targets,
+            # Currently we work with batches of one.
+            feed = {inputs: train_inputs[batch],
+                    targets: train_targets[batch],
                     seq_len: train_seq_len}
 
             batch_cost, _ = session.run([cost, optimizer], feed)
@@ -172,13 +191,10 @@ with tf.Session(graph=graph) as session:
         print(log.format(curr_epoch+1, num_epochs, train_cost, train_ler,
                          val_cost, val_ler, time.time() - start))
 
-    # Decoding
-    d = session.run(decoded[0], feed_dict=feed)
+        # Decoding
+        d = session.run(decoded[0], feed_dict=val_feed)
 
-    str_decoded = ''.join([MORSE_CHR[x] for x in np.asarray(d[1])])
+        str_decoded = ''.join([MORSE_CHR[x] for x in np.asarray(d[1])]).replace('\0', '')
 
-    # Replacing blank label to none
-    str_decoded = str_decoded.replace('\0', '')
-
-    print('Original:\n%s' % original)
-    print('Decoded:\n%s' % str_decoded)
+        print('Original: %s' % raw_targets[0])
+        print('Decoded:  %s\n' % str_decoded)
