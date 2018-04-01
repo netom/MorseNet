@@ -134,7 +134,6 @@ with graph.as_default():
     # Time major
     logits = tf.transpose(logits, (1, 0, 2))
 
-    # TODO: isn't seq_len is the length of each label sequence in the batch?
     loss = tf.nn.ctc_loss(targets, logits, seq_len)
     cost = tf.reduce_mean(loss)
 
