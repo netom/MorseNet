@@ -42,12 +42,12 @@ for i in range(batch_size):
 
     train_inputs.append(inputs)
 
-train_inputs=np.asarray(train_inputs, dtype=np.float32)
+train_inputs  = np.asarray(train_inputs, dtype=np.float32)
+train_seq_len = np.asarray([time_steps]*batch_size, dtype=np.int32)
 
 # Read targets
 tt_indices = []
 tt_values  = []
-tt_seq_len = []
 max_target_len = 0
 for i in range(batch_size):
     target_filename = target_filename_tpl % (0, i)
@@ -63,27 +63,20 @@ for i in range(batch_size):
     if  tlen > max_target_len:
         max_target_len = tlen
 
-    # Oh FUCK YOU very much dear TesorFlow documentation.
-    # What the fuck are these mysterious sequences???
-    #tt_seq_len.append(tlen+10)
-    tt_seq_len.append(time_steps)
-
     # Creating sparse representation to feed the placeholder
     for j, value in enumerate(targets):
         tt_indices.append([i,j])
         tt_values.append(value)
 
-tt_seq_len = np.asarray(tt_seq_len, dtype=np.int32)
-
 # Build a sparse matrix for training required by the ctc loss function
 train_targets = tf.SparseTensorValue(
     tt_indices,
     np.asarray(tt_values, dtype=np.int32),
-    (batch_size, max_target_len) # TODO: maximal string length?
+    (batch_size, max_target_len)
 )
 
 # Make our validation set to be the 0th one
-val_inputs, val_targets, val_seq_len = train_inputs, train_targets, tt_seq_len
+val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_len
 
 
 # THE MAIN CODE!
@@ -115,7 +108,7 @@ with graph.as_default():
     stack = tf.contrib.rnn.MultiRNNCell(cells)
 
     # The second output is the last state and we will no use that
-    outputs, _ = tf.nn.dynamic_rnn(stack, inputs, dtype=tf.float32)
+    outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
 
     shape = tf.shape(inputs)
     batch_s, max_timesteps = shape[0], shape[1]
@@ -174,9 +167,11 @@ with tf.Session(graph=graph) as session:
         # Currently we work with batches of one.
         for batch in range(num_batches_per_epoch):
 
-            feed = {inputs: train_inputs,
-                    targets: train_targets,
-                    seq_len: tt_seq_len}
+            feed = {
+                inputs: train_inputs,
+                targets: train_targets,
+                seq_len: train_seq_len
+            }
 
             batch_cost, _ = session.run([cost, optimizer], feed)
             train_cost += batch_cost*batch_size
