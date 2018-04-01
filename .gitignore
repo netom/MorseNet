@@ -4,3 +4,4 @@ training_set
 *.pyc
 *.npz
 *.pickle
+__pycache__
