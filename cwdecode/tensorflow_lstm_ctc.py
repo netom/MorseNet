@@ -4,27 +4,30 @@ import tensorflow as tf
 import scipy.io.wavfile as wav
 import numpy as np
 
-try:
-    from python_speech_features import mfcc
-except ImportError:
-    print("Failed to import python_speech_features.\n Try pip install python_speech_features.")
-    raise ImportError
+from config import *
 
-from utils import maybe_download as maybe_download
-from utils import sparse_tuple_from as sparse_tuple_from
+def sparse_tuple_from(sequences, dtype=np.int32):
+    """Create a sparse representention of x.
+    Args:
+        sequences: a list of lists of type dtype where each element is a sequence
+    Returns:
+        A tuple with (indices, values, shape)
+    """
+    indices = []
+    values = []
 
-# Constants
-SPACE_TOKEN = '<space>'
-SPACE_INDEX = 0
-FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
+    for n, seq in enumerate(sequences):
+        indices.extend(zip([n]*len(seq), range(len(seq))))
+        values.extend(seq)
 
-# Some configs
-num_features = 13
-# Accounting the 0th indice +  space + blank label = 28 characters
-num_classes = ord('z') - ord('a') + 1 + 1 + 1
+    indices = np.asarray(indices, dtype=np.int64)
+    values = np.asarray(values, dtype=dtype)
+    shape = np.asarray([len(sequences), np.asarray(indices).max(0)[1]+1], dtype=np.int64)
+
+    return indices, values, shape
 
 # Hyper-parameters
-num_epochs = 200
+num_epochs = 100
 num_hidden = 50
 num_layers = 1
 batch_size = 1
@@ -36,12 +39,15 @@ num_batches_per_epoch = int(num_examples/batch_size)
 
 # Loading the data
 
-audio_filename = maybe_download('LDC93S1.wav', 93638)
-target_filename = maybe_download('LDC93S1.txt', 62)
+audio_filename = 'training_set/0000/000.wav'
+target_filename = 'training_set/0000/000.txt'
 
 fs, audio = wav.read(audio_filename)
 
-inputs = mfcc(audio, samplerate=fs)
+time_steps = len(audio)//CHUNK
+truncated_autio_length = time_steps * CHUNK
+
+inputs = np.reshape(audio[:truncated_autio_length],  (time_steps, CHUNK))
 
 # Tranform in 3D array
 train_inputs = np.asarray(inputs[np.newaxis, :])
@@ -50,41 +56,30 @@ train_seq_len = [train_inputs.shape[1]]
 
 # Readings targets
 with open(target_filename, 'r') as f:
+    targets = list(map(lambda x: x[0], f.readlines()))
 
-    #Only the last line is necessary
-    line = f.readlines()[-1]
-
-    # Get only the words between [a-z] and replace period for none
-    original = ' '.join(line.strip().lower().split(' ')[2:]).replace('.', '')
-    targets = original.replace(' ', '  ')
-    targets = targets.split(' ')
-
-# Adding blank label
-targets = np.hstack([SPACE_TOKEN if x == '' else list(x) for x in targets])
+original = ''.join(targets)
 
 # Transform char into index
-targets = np.asarray([SPACE_INDEX if x == SPACE_TOKEN else ord(x) - FIRST_INDEX
-                      for x in targets])
-
-print(targets)
-exit()
+targets = np.asarray([MORSE_CHR.index(x) for x in targets])
 
 # Creating sparse representation to feed the placeholder
 train_targets = sparse_tuple_from([targets])
 
 # We don't have a validation dataset :(
-val_inputs, val_targets, val_seq_len = train_inputs, train_targets, \
-                                       train_seq_len
+val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_len
 
 
 # THE MAIN CODE!
 
+
 graph = tf.Graph()
 with graph.as_default():
-    # e.g: log filter bank or MFCC features
-    # Has size [batch_size, max_stepsize, num_features], but the
+    # Has size [batch_size, max_stepsize, CHUNK], but the
     # batch_size and max_stepsize can vary along each step
-    inputs = tf.placeholder(tf.float32, [None, None, num_features])
+    # Note chat CHUNK is the size of the audio data chunk processed
+    # at each step, which is the number of input features.
+    inputs = tf.placeholder(tf.float32, [None, None, CHUNK])
 
     # Here we use sparse_placeholder that will generate a
     # SparseTensor required by ctc_loss op.
@@ -116,18 +111,17 @@ with graph.as_default():
     # Truncated normal with mean 0 and stdev=0.1
     # Tip: Try another initialization
     # see https://www.tensorflow.org/versions/r0.9/api_docs/python/contrib.layers.html#initializers
-    W = tf.Variable(tf.truncated_normal([num_hidden,
-                                         num_classes],
-                                        stddev=0.1))
+    W = tf.Variable(tf.truncated_normal([num_hidden, NUM_CLASSES], stddev=0.1))
+
     # Zero initialization
     # Tip: Is tf.zeros_initializer the same?
-    b = tf.Variable(tf.constant(0., shape=[num_classes]))
+    b = tf.Variable(tf.constant(0., shape=[NUM_CLASSES]))
 
     # Doing the affine projection
     logits = tf.matmul(outputs, W) + b
 
     # Reshaping back to the original shape
-    logits = tf.reshape(logits, [batch_s, -1, num_classes])
+    logits = tf.reshape(logits, [batch_s, -1, NUM_CLASSES])
 
     # Time major
     logits = tf.transpose(logits, (1, 0, 2))
@@ -177,13 +171,14 @@ with tf.Session(graph=graph) as session:
         log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, val_cost = {:.3f}, val_ler = {:.3f}, time = {:.3f}"
         print(log.format(curr_epoch+1, num_epochs, train_cost, train_ler,
                          val_cost, val_ler, time.time() - start))
+
     # Decoding
     d = session.run(decoded[0], feed_dict=feed)
-    str_decoded = ''.join([chr(x) for x in np.asarray(d[1]) + FIRST_INDEX])
+
+    str_decoded = ''.join([MORSE_CHR[x] for x in np.asarray(d[1])])
+
     # Replacing blank label to none
-    str_decoded = str_decoded.replace(chr(ord('z') + 1), '')
-    # Replacing space label to space
-    str_decoded = str_decoded.replace(chr(ord('a') - 1), ' ')
+    str_decoded = str_decoded.replace('\0', '')
 
     print('Original:\n%s' % original)
     print('Decoded:\n%s' % str_decoded)

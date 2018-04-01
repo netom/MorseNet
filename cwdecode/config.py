@@ -24,7 +24,9 @@ MAX_SEQ_LENGTH = FRAMERATE * 30
 TRAINING_SET_DIR = 'training_set'
 
 # The character set in canonical order
-MORSE_CHR = ['\0','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','0','1','2','3','4','5','6','7','8','9', ' ']
+MORSE_CHR = [' ','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','0','1','2','3','4','5','6','7','8','9', '\0']
+
+NUM_CLASSES = len(MORSE_CHR)
 
 # Maps a character to it's serial number
 MORSE_ORD = {}

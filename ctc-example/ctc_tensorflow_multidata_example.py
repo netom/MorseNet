@@ -87,6 +87,7 @@ with graph.as_default():
     #   tf.nn.rnn_cell.GRUCell
     # Stacking rnn cells
     cells = []
+    num_units = 50
     for _ in range(num_layers):
         cell = tf.contrib.rnn.LSTMCell(num_units)  # Or LSTMCell(num_units)
         cells.append(cell)
