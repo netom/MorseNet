@@ -6,36 +6,16 @@ import numpy as np
 
 from config import *
 
-def sparse_tuple_from(sequences, dtype=np.int32):
-    """Create a sparse representention of x.
-    Args:
-        sequences: a list of lists of type dtype where each element is a sequence
-    Returns:
-        A tuple with (indices, values, shape)
-    """
-    indices = []
-    values = []
-
-    for n, seq in enumerate(sequences):
-        indices.extend(zip([n]*len(seq), range(len(seq))))
-        values.extend(seq)
-
-    indices = np.asarray(indices, dtype=np.int64)
-    values = np.asarray(values, dtype=dtype)
-    shape = np.asarray([len(sequences), np.asarray(indices).max(0)[1]+1], dtype=np.int64)
-
-    return indices, values, shape
-
 # Hyper-parameters
-num_epochs = 100
+num_epochs = 200
 num_hidden = 128
 num_units = 128
 num_layers = 1
 initial_learning_rate = 1e-2
 momentum = 0.8
 
-num_examples = 201
-batch_size = 1
+num_examples = 35
+batch_size = num_examples
 num_batches_per_epoch = int(num_examples/batch_size)
 
 # Load the data
@@ -48,8 +28,8 @@ train_targets = []
 raw_targets   = []
 
 # Files must be of the same length in one batch
-for i in range(num_batches_per_epoch):
-    audio_filename = audio_filename_tpl % (i // 35, i % 35)
+for i in range(batch_size):
+    audio_filename = audio_filename_tpl % (0, i)
 
     fs, audio = wav.read(audio_filename)
 
@@ -57,19 +37,20 @@ for i in range(num_batches_per_epoch):
     truncated_autio_length = time_steps * CHUNK
 
     # Input shape is [num_batches, time_steps, CHUNK (features)]
-    inputs = np.reshape(audio[:truncated_autio_length],  (1, time_steps, CHUNK))
+    inputs = np.reshape(audio[:truncated_autio_length],  (time_steps, CHUNK))
     inputs = (inputs - np.mean(inputs)) / np.std(inputs)
 
     train_inputs.append(inputs)
 
-# Convert inputs to numpy array and normalize them
-# This piece of code tries to assemble a batch, but for now it assembles
-# several batches of length of one.
-train_seq_len = [train_inputs[0].shape[1]]
+train_inputs=np.asarray(train_inputs, dtype=np.float32)
 
 # Read targets
-for i in range(num_batches_per_epoch):
-    target_filename = target_filename_tpl % (i // 35, i % 35)
+tt_indices = []
+tt_values  = []
+tt_seq_len = []
+max_target_len = 0
+for i in range(batch_size):
+    target_filename = target_filename_tpl % (0, i)
 
     with open(target_filename, 'r') as f:
         targets = list(map(lambda x: x[0], f.readlines()))
@@ -78,16 +59,31 @@ for i in range(num_batches_per_epoch):
 
     # Transform char into index
     targets = np.asarray([MORSE_CHR.index(x) for x in targets])
+    tlen = len(targets)
+    if  tlen > max_target_len:
+        max_target_len = tlen
+
+    # Oh FUCK YOU very much dear TesorFlow documentation.
+    # What the fuck are these mysterious sequences???
+    #tt_seq_len.append(tlen+10)
+    tt_seq_len.append(time_steps)
 
     # Creating sparse representation to feed the placeholder
-    train_targets.append(sparse_tuple_from([targets]))
+    for j, value in enumerate(targets):
+        tt_indices.append([i,j])
+        tt_values.append(value)
+
+tt_seq_len = np.asarray(tt_seq_len, dtype=np.int32)
 
 # Build a sparse matrix for training required by the ctc loss function
-#train_targets = sparse_tuple_from(train_targets)
-#train_targets = np.asarray(train_targets)
+train_targets = tf.SparseTensorValue(
+    tt_indices,
+    np.asarray(tt_values, dtype=np.int32),
+    (batch_size, max_target_len) # TODO: maximal string length?
+)
 
 # Make our validation set to be the 0th one
-val_inputs, val_targets, val_seq_len = train_inputs[0], train_targets[0], train_seq_len
+val_inputs, val_targets, val_seq_len = train_inputs, train_targets, tt_seq_len
 
 
 # THE MAIN CODE!
@@ -106,7 +102,7 @@ with graph.as_default():
     targets = tf.sparse_placeholder(tf.int32)
 
     # 1d array of size [batch_size]
-    seq_len = tf.placeholder(tf.int32, [None])
+    seq_len = tf.placeholder(tf.int32, [batch_size])
 
     # Defining the cell
     # Can be:
@@ -114,12 +110,12 @@ with graph.as_default():
     #   tf.nn.rnn_cell.GRUCell 
     cells = []
     for _ in range(num_layers):
-        cell = tf.contrib.rnn.LSTMCell(num_units)  # Or LSTMCell(num_units)
+        cell = tf.contrib.rnn.LSTMCell(num_units)
         cells.append(cell)
     stack = tf.contrib.rnn.MultiRNNCell(cells)
 
     # The second output is the last state and we will no use that
-    outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
+    outputs, _ = tf.nn.dynamic_rnn(stack, inputs, dtype=tf.float32)
 
     shape = tf.shape(inputs)
     batch_s, max_timesteps = shape[0], shape[1]
@@ -145,6 +141,7 @@ with graph.as_default():
     # Time major
     logits = tf.transpose(logits, (1, 0, 2))
 
+    # TODO: isn't seq_len is the length of each label sequence in the batch?
     loss = tf.nn.ctc_loss(targets, logits, seq_len)
     cost = tf.reduce_mean(loss)
 
@@ -153,27 +150,33 @@ with graph.as_default():
 
     # Option 2: tf.nn.ctc_beam_search_decoder
     # (it's slower but you'll get better results)
-    #decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
-    decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len, beam_width=10)
+    decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
+    #decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len, beam_width=10)
 
     # Inaccuracy: label error rate
-    ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),
-                                          targets))
+    ler = tf.reduce_mean(
+        tf.edit_distance(tf.cast(decoded[0], tf.int32), targets)
+    )
+
+print("*** STARTING TRAINING SESSION ***")
 
 with tf.Session(graph=graph) as session:
     # Initializate the weights and biases
     tf.global_variables_initializer().run()
 
+    #session.run([targets], {targets: train_targets})
+    #exit()
+
     for curr_epoch in range(num_epochs):
         train_cost = train_ler = 0
         start = time.time()
 
-        for batch in range(1,num_batches_per_epoch):
+        # Currently we work with batches of one.
+        for batch in range(num_batches_per_epoch):
 
-            # Currently we work with batches of one.
-            feed = {inputs: train_inputs[batch],
-                    targets: train_targets[batch],
-                    seq_len: train_seq_len}
+            feed = {inputs: train_inputs,
+                    targets: train_targets,
+                    seq_len: tt_seq_len}
 
             batch_cost, _ = session.run([cost, optimizer], feed)
             train_cost += batch_cost*batch_size
@@ -182,20 +185,21 @@ with tf.Session(graph=graph) as session:
         train_cost /= num_examples
         train_ler /= num_examples
 
-        val_feed = {inputs: val_inputs,
-                    targets: val_targets,
-                    seq_len: val_seq_len}
+        #val_feed = {inputs: val_inputs,
+        #            targets: val_targets,
+        #            seq_len: val_seq_len}
 
-        val_cost, val_ler = session.run([cost, ler], feed_dict=val_feed)
+        #val_cost, val_ler = session.run([cost, ler], feed_dict=val_feed)
+        val_cost, val_ler = train_cost, train_ler
 
         log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, val_cost = {:.3f}, val_ler = {:.3f}, time = {:.3f}"
         print(log.format(curr_epoch+1, num_epochs, train_cost, train_ler,
                          val_cost, val_ler, time.time() - start))
 
         # Decoding
-        d = session.run(decoded[0], feed_dict=val_feed)
+        #d = session.run(decoded[0], feed_dict=val_feed)
 
-        str_decoded = ''.join([MORSE_CHR[x] for x in np.asarray(d[1])]).replace('\0', '')
+        #str_decoded = ''.join([MORSE_CHR[x] for x in np.asarray(d[1])]).replace('\0', '')
 
-        print('Original: "%s"' % raw_targets[0])
-        print('Decoded:  "%s"\n' % str_decoded)
+        #print('Original: "%s"' % ''.join(raw_targets))
+        #print('Decoded:  "%s"\n' % str_decoded)
