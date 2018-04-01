@@ -27,14 +27,14 @@ def sparse_tuple_from(sequences, dtype=np.int32):
     return indices, values, shape
 
 # Hyper-parameters
-num_epochs = 200
-num_hidden = 50
-num_units = 50
+num_epochs = 100
+num_hidden = 128
+num_units = 128
 num_layers = 1
 initial_learning_rate = 1e-2
-momentum = 0.9
+momentum = 0.8
 
-num_examples = 101
+num_examples = 201
 batch_size = 1
 num_batches_per_epoch = int(num_examples/batch_size)
 
@@ -153,7 +153,8 @@ with graph.as_default():
 
     # Option 2: tf.nn.ctc_beam_search_decoder
     # (it's slower but you'll get better results)
-    decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
+    #decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
+    decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len, beam_width=10)
 
     # Inaccuracy: label error rate
     ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),
@@ -196,5 +197,5 @@ with tf.Session(graph=graph) as session:
 
         str_decoded = ''.join([MORSE_CHR[x] for x in np.asarray(d[1])]).replace('\0', '')
 
-        print('Original: %s' % raw_targets[0])
-        print('Decoded:  %s\n' % str_decoded)
+        print('Original: "%s"' % raw_targets[0])
+        print('Decoded:  "%s"\n' % str_decoded)
