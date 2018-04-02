@@ -48,8 +48,8 @@ train_inputs  = np.asarray(train_inputs, dtype=np.float32)
 train_seq_len = np.asarray([time_steps]*batch_size, dtype=np.int32)
 
 # Read targets
-tt_indices = []
-tt_values  = []
+tt_indices  = []
+tt_values   = []
 max_target_len = 0
 for i in range(batch_size):
     target_filename = target_filename_tpl % (0, i)
@@ -76,10 +76,6 @@ train_targets = tf.SparseTensorValue(
     np.asarray(tt_values, dtype=np.int32),
     (batch_size, max_target_len)
 )
-
-# Make our validation set to be the 0th one
-val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_len
-
 
 # THE MAIN CODE!
 
@@ -180,19 +176,11 @@ with tf.Session(graph=graph, config=tf.ConfigProto(log_device_placement=True)) a
         train_cost /= num_examples
         train_ler /= num_examples
 
-        #val_feed = {inputs: val_inputs,
-        #            targets: val_targets,
-        #            seq_len: val_seq_len}
-
-        #val_cost, val_ler = session.run([cost, ler], feed_dict=val_feed)
-        val_cost, val_ler = train_cost, train_ler
-
-        log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, val_cost = {:.3f}, val_ler = {:.3f}, time = {:.3f}"
-        print(log.format(curr_epoch+1, num_epochs, train_cost, train_ler,
-                         val_cost, val_ler, time.time() - start))
+        log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
+        print(log.format(curr_epoch+1, num_epochs, train_cost, train_ler, time.time() - start))
 
         # Decoding
-        #d = session.run(decoded[0], feed_dict=val_feed)
+        #d = session.run(decoded[0], feed_dict=feed)
 
         #str_decoded = ''.join([MORSE_CHR[x] for x in np.asarray(d[1])]).replace('\0', '')
 
