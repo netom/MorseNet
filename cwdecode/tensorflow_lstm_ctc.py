@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import time
 
 import tensorflow as tf
@@ -7,12 +9,12 @@ import numpy as np
 from config import *
 
 # Hyper-parameters
-num_epochs = 200
+num_epochs = 2000
 num_hidden = 128
 num_units = 128
 num_layers = 1
 initial_learning_rate = 1e-2
-momentum = 0.8
+momentum = 0.9
 
 num_examples = 35
 batch_size = num_examples
@@ -80,7 +82,6 @@ val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_le
 
 
 # THE MAIN CODE!
-
 
 graph = tf.Graph()
 with graph.as_default():
@@ -152,7 +153,7 @@ with graph.as_default():
 
 print("*** STARTING TRAINING SESSION ***")
 
-with tf.Session(graph=graph) as session:
+with tf.Session(graph=graph, config=tf.ConfigProto(log_device_placement=True)) as session:
     # Initializate the weights and biases
     tf.global_variables_initializer().run()
 
