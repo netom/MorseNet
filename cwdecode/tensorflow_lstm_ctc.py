@@ -94,7 +94,7 @@ with graph.as_default():
     # Defining the cell
     # Can be:
     #   tf.nn.rnn_cell.RNNCell
-    #   tf.nn.rnn_cell.GRUCell 
+    #   tf.nn.rnn_cell.GRUCell
     cells = []
     for _ in range(num_layers):
         cell = tf.contrib.rnn.LSTMCell(num_units)
@@ -147,10 +147,10 @@ with graph.as_default():
 print("*** LOADING DATA ***")
 
 batch_size = 35
-num_batches_per_epoch = 20
+num_batches_per_epoch = 599
 num_examples = num_batches_per_epoch * batch_size
 
-valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(num_batches_per_epoch, 5)
+valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(num_batches_per_epoch, 35)
 
 batch_data = []
 for batch_id in range(num_batches_per_epoch):
@@ -158,7 +158,11 @@ for batch_id in range(num_batches_per_epoch):
 
 print("*** STARTING TRAINING SESSION ***")
 
-with tf.Session(graph=graph, config=tf.ConfigProto(log_device_placement=False)) as session:
+tfconfig = tf.ConfigProto(
+    device_count = { 'GPU': 0 },
+    log_device_placement = False
+)
+with tf.Session(graph=graph, config=tfconfig) as session:
     # Initializate the weights and biases
     tf.global_variables_initializer().run()
 
