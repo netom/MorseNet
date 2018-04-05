@@ -195,9 +195,11 @@ def save_new_batch(i):
         os.makedirs(dirname)
 
     for j in range(BATCH_SIZE):
+        filename = dirname + '/%03d.wav' % j
+
         audio, characters = generate_seq(seq_length)
 
-        scipy.io.wavfile.write(dirname + '/%03d.wav' % j, FRAMERATE, audio)
+        scipy.io.wavfile.write(filename, FRAMERATE, audio)
 
         with open(dirname + '/%03d.txt' % j, 'w') as f:
             f.write('\n'.join(map(lambda x: x[0] + ',' + str(x[1]), characters)))

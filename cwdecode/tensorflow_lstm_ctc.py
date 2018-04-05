@@ -138,14 +138,14 @@ with graph.as_default():
     loss = tf.nn.ctc_loss(targets, logits, seq_len)
     cost = tf.reduce_mean(loss)
 
-    optimizer = tf.train.AdamOptimizer(
-        0.01
-    ).minimize(cost)
+    # Old learning rate = 0.0002
+    # Treshold = 2.0 step clipping (gradient clipping?)
+    optimizer = tf.train.AdamOptimizer(0.01, 0.9, 0.999, 0.1).minimize(cost)
 
     # Option 2: tf.nn.ctc_beam_search_decoder
     # (it's slower but you'll get better results)
-    decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
-    #decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len, beam_width=10)
+    #decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
+    decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len, beam_width=10)
 
     # Inaccuracy: label error rate
     ler = tf.reduce_mean(
@@ -154,8 +154,8 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-batch_size = 1000
-num_batches_per_epoch = 21
+batch_size = 2000
+num_batches_per_epoch = 10
 num_examples = num_batches_per_epoch * batch_size
 
 valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(21, 10)
