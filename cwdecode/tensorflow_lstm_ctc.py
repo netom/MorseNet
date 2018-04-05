@@ -5,6 +5,7 @@ import time
 import tensorflow as tf
 import scipy.io.wavfile as wav
 import numpy as np
+import sys
 
 from config import *
 
@@ -30,6 +31,7 @@ def load_batch(batch_id, batch_size):
         inputs = (inputs - np.mean(inputs)) / np.std(inputs)
 
         train_inputs_.append(inputs)
+        sys.stdout.write("Loading batch %d: %d... \r" % (batch_id, i))
 
     train_inputs_  = np.asarray(train_inputs_, dtype=np.float32)
     train_seq_len_ = np.asarray([time_steps]*batch_size, dtype=np.int32)
@@ -98,6 +100,7 @@ with graph.as_default():
     cells = []
     for _ in range(num_layers):
         cell = tf.contrib.rnn.LSTMCell(num_units)
+        #cell = tf.contrib.rnn.LSTMBlockFusedCell(num_units)
         cells.append(cell)
     stack = tf.contrib.rnn.MultiRNNCell(cells)
 
@@ -146,11 +149,11 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-batch_size = 35
-num_batches_per_epoch = 599
+batch_size = 1000
+num_batches_per_epoch = 21
 num_examples = num_batches_per_epoch * batch_size
 
-valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(num_batches_per_epoch, 35)
+valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(21, 10)
 
 batch_data = []
 for batch_id in range(num_batches_per_epoch):
@@ -159,8 +162,14 @@ for batch_id in range(num_batches_per_epoch):
 print("*** STARTING TRAINING SESSION ***")
 
 tfconfig = tf.ConfigProto(
-    device_count = { 'GPU': 0 },
-    log_device_placement = False
+    device_count = {
+        'GPU': 0,
+        #'CPU': 8
+    },
+    #intra_op_parallelism_threads = 16,
+    #inter_op_parallelism_threads = 16,
+    log_device_placement = False,
+    #allow_soft_placement = True
 )
 with tf.Session(graph=graph, config=tfconfig) as session:
     # Initializate the weights and biases
@@ -172,6 +181,7 @@ with tf.Session(graph=graph, config=tfconfig) as session:
 
         # Currently we work with batches of one.
         for batch_id in range(num_batches_per_epoch):
+            bstart = time.time()
 
             train_inputs, train_seq_len, train_targets, train_raw_targets = batch_data[batch_id]
 
@@ -184,6 +194,9 @@ with tf.Session(graph=graph, config=tfconfig) as session:
             batch_cost, _ = session.run([cost, optimizer], feed)
             train_cost   += batch_cost*batch_size
             train_ler    += session.run(ler, feed_dict=feed)*batch_size
+
+            a = int((batch_id / num_batches_per_epoch) * 50)
+            sys.stdout.write("[" + ("="*a) + ">" + " "*(50-a) + "] " + ("%.2f" % (time.time()-bstart)) + "s   \r")
 
         train_cost /= num_examples
         train_ler /= num_examples

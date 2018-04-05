@@ -11,10 +11,10 @@ FFT_SIZE = 128 # 62.5Hz wide bins
 CHUNK = 256
 
 # The number of batches to generate
-NUM_BATCHES = 600
+NUM_BATCHES = 21
 
 # The size of a batch
-BATCH_SIZE = 35
+BATCH_SIZE = 1000
 
 # The size of a sample in chunks (10 seconds)
 MIN_SEQ_LENGTH = FRAMERATE * 10

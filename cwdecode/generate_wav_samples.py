@@ -8,7 +8,7 @@ import numpy as np
 import scipy.signal as sig
 import random
 import _pickle as cPickle
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import scipy.io.wavfile
 import scipy.signal
 
@@ -63,7 +63,7 @@ def qsb(frames, vol, f):
 
 # Returns a random morse character
 def get_next_character():
-    return random.choice(MORSE_CHR[1:] + [' '] * 5)
+    return random.choice(MORSE_CHR[:-1] + [' '] * 5)
 
 # Returns: ([(1/0, duration), ...], total length)
 def get_onoff_data(c, wpm, deviation, ):
