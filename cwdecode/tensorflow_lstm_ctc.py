@@ -33,7 +33,7 @@ def load_batch(batch_id, batch_size):
         train_inputs_.append(inputs)
         sys.stdout.write("Loading batch %d: %d... \r" % (batch_id, i))
 
-    train_inputs_  = np.asarray(train_inputs_, dtype=np.float32)
+    train_inputs_  = np.asarray(train_inputs_, dtype=np.float32).transpose((1,0,2))
     train_seq_len_ = np.asarray([time_steps]*batch_size, dtype=np.int32)
 
     # Read targets
@@ -80,7 +80,7 @@ momentum = 0.9
 
 graph = tf.Graph()
 with graph.as_default():
-    # Has size [batch_size, max_stepsize, CHUNK], but the
+    # Has size [max_stepsize, batch_size, CHUNK], but the
     # batch_size and max_stepsize can vary along each step
     # Note chat CHUNK is the size of the audio data chunk processed
     # at each step, which is the number of input features.
@@ -111,7 +111,7 @@ with graph.as_default():
     outputs, _ = lstmbfc(inputs, dtype=tf.float32) # Actually retrieves the output. Clever.
 
     shape = tf.shape(inputs)
-    batch_s, max_timesteps = shape[0], shape[1]
+    max_timesteps, batch_s = shape[0], shape[1]
 
     # Reshaping to apply the same weights over the timesteps
     outputs = tf.reshape(outputs, [-1, num_hidden])
@@ -130,10 +130,10 @@ with graph.as_default():
     #logits = tf.layers.dense(outputs, num_hidden, activation=tf.nn.sigmoid)
 
     # Reshaping back to the original shape
-    logits = tf.reshape(logits, [batch_s, -1, NUM_CLASSES])
+    logits = tf.reshape(logits, [-1, batch_s, NUM_CLASSES])
 
     # Time major
-    logits = tf.transpose(logits, (1, 0, 2))
+    #logits = tf.transpose(logits, (1, 0, 2))
 
     loss = tf.nn.ctc_loss(targets, logits, seq_len)
     cost = tf.reduce_mean(loss)
