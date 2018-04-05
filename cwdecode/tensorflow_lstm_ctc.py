@@ -97,15 +97,18 @@ with graph.as_default():
     # Can be:
     #   tf.nn.rnn_cell.RNNCell
     #   tf.nn.rnn_cell.GRUCell
-    cells = []
-    for _ in range(num_layers):
-        cell = tf.contrib.rnn.LSTMCell(num_units)
-        #cell = tf.contrib.rnn.LSTMBlockFusedCell(num_units)
-        cells.append(cell)
-    stack = tf.contrib.rnn.MultiRNNCell(cells)
+    #cells = []
+    #for _ in range(num_layers):
+    #    cell = tf.contrib.rnn.LSTMCell(num_units)
+    #    #cell = tf.contrib.rnn.LSTMBlockFusedCell(num_units)
+    #    cells.append(cell)
+    #stack = tf.contrib.rnn.MultiRNNCell(cells)
 
     # The second output is the last state and we will no use that
-    outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
+    #outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
+
+    lstmbfc = tf.contrib.rnn.LSTMBlockFusedCell(num_units) # Creates a factory
+    outputs, _ = lstmbfc(inputs, dtype=tf.float32) # Actually retrieves the output. Clever.
 
     shape = tf.shape(inputs)
     batch_s, max_timesteps = shape[0], shape[1]
@@ -124,6 +127,7 @@ with graph.as_default():
 
     # Doing the affine projection
     logits = tf.matmul(outputs, W) + b
+    #logits = tf.layers.dense(outputs, num_hidden, activation=tf.nn.sigmoid)
 
     # Reshaping back to the original shape
     logits = tf.reshape(logits, [batch_s, -1, NUM_CLASSES])
@@ -134,8 +138,9 @@ with graph.as_default():
     loss = tf.nn.ctc_loss(targets, logits, seq_len)
     cost = tf.reduce_mean(loss)
 
-    optimizer = tf.train.MomentumOptimizer(initial_learning_rate,
-                                           0.9).minimize(cost)
+    optimizer = tf.train.AdamOptimizer(
+        0.01
+    ).minimize(cost)
 
     # Option 2: tf.nn.ctc_beam_search_decoder
     # (it's slower but you'll get better results)
