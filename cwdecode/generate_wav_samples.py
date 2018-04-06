@@ -66,7 +66,7 @@ def get_next_character():
     return random.choice(MORSE_CHR[:-1] + [' '] * 5)
 
 # Returns: ([(1/0, duration), ...], total length)
-def get_onoff_data(c, wpm, deviation, ):
+def get_onoff_data(c, wpm, deviation):
     pairs = []
     length = 0
     if c == ' ':

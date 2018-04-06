@@ -93,22 +93,8 @@ with graph.as_default():
     # 1d array of size [batch_size]
     seq_len = tf.placeholder(tf.int32, [None])
 
-    # Defining the cell
-    # Can be:
-    #   tf.nn.rnn_cell.RNNCell
-    #   tf.nn.rnn_cell.GRUCell
-    #cells = []
-    #for _ in range(num_layers):
-    #    cell = tf.contrib.rnn.LSTMCell(num_units)
-    #    #cell = tf.contrib.rnn.LSTMBlockFusedCell(num_units)
-    #    cells.append(cell)
-    #stack = tf.contrib.rnn.MultiRNNCell(cells)
-
-    # The second output is the last state and we will no use that
-    #outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
-
     lstmbfc = tf.contrib.rnn.LSTMBlockFusedCell(num_units) # Creates a factory
-    outputs, _ = lstmbfc(inputs, dtype=tf.float32) # Actually retrieves the output. Clever.
+    outputs, final_state = lstmbfc(inputs, initial_state=None, dtype=tf.float32) # Actually retrieves the output. Clever.
 
     shape = tf.shape(inputs)
     max_timesteps, batch_s = shape[0], shape[1]
@@ -116,25 +102,13 @@ with graph.as_default():
     # Reshaping to apply the same weights over the timesteps
     outputs = tf.reshape(outputs, [-1, num_hidden])
 
-    # Truncated normal with mean 0 and stdev=0.1
-    # Tip: Try another initialization
-    # see https://www.tensorflow.org/versions/r0.9/api_docs/python/contrib.layers.html#initializers
-    W = tf.Variable(tf.truncated_normal([num_hidden, NUM_CLASSES], stddev=0.1))
-
-    # Zero initialization
-    # Tip: Is tf.zeros_initializer the same?
-    b = tf.Variable(tf.constant(0., shape=[NUM_CLASSES]))
-
     # Doing the affine projection
-    logits = tf.matmul(outputs, W) + b
-    #logits = tf.layers.dense(outputs, num_hidden, activation=tf.nn.sigmoid)
+    logits = tf.layers.dense(outputs, NUM_CLASSES, activation=tf.nn.relu)
 
     # Reshaping back to the original shape
     logits = tf.reshape(logits, [-1, batch_s, NUM_CLASSES])
 
-    # Time major
-    #logits = tf.transpose(logits, (1, 0, 2))
-
+    # ctc_loss is by default time major
     loss = tf.nn.ctc_loss(targets, logits, seq_len)
     cost = tf.reduce_mean(loss)
 
@@ -142,8 +116,6 @@ with graph.as_default():
     # Treshold = 2.0 step clipping (gradient clipping?)
     optimizer = tf.train.AdamOptimizer(0.01, 0.9, 0.999, 0.1).minimize(cost)
 
-    # Option 2: tf.nn.ctc_beam_search_decoder
-    # (it's slower but you'll get better results)
     #decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
     decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len, beam_width=10)
 
@@ -154,11 +126,11 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-batch_size = 2000
-num_batches_per_epoch = 10
+batch_size = 50
+num_batches_per_epoch = 1
 num_examples = num_batches_per_epoch * batch_size
 
-valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(21, 10)
+valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(0, 5)
 
 batch_data = []
 for batch_id in range(num_batches_per_epoch):
