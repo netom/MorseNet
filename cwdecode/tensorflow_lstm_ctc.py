@@ -126,11 +126,11 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-batch_size = 50
-num_batches_per_epoch = 1
+batch_size = 500
+num_batches_per_epoch = 5
 num_examples = num_batches_per_epoch * batch_size
 
-valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(0, 5)
+valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(5, 5)
 
 batch_data = []
 for batch_id in range(num_batches_per_epoch):
