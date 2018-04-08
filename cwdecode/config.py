@@ -11,14 +11,14 @@ FFT_SIZE = 128 # 62.5Hz wide bins
 CHUNK = 256
 
 # The number of batches to generate
-NUM_BATCHES = 10
+NUM_BATCHES = 11
 
 # The size of a batch
-BATCH_SIZE = 500
+BATCH_SIZE = 1000
 
-# The size of a sample in chunks (10 seconds)
-MIN_SEQ_LENGTH = FRAMERATE * 10
-MAX_SEQ_LENGTH = FRAMERATE * 10
+# The size of a sample in chunks
+MIN_SEQ_LENGTH = FRAMERATE * 12
+MAX_SEQ_LENGTH = FRAMERATE * 18
 
 # The directory in wich the examples are saved
 TRAINING_SET_DIR = 'training_set'
