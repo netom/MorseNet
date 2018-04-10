@@ -11,7 +11,7 @@ FFT_SIZE = 128 # 62.5Hz wide bins
 CHUNK = 256
 
 # The number of batches to generate
-NUM_BATCHES = 11
+NUM_BATCHES = 21
 
 # The size of a batch
 BATCH_SIZE = 1000

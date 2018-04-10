@@ -126,11 +126,11 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-batch_size = 1000
-num_batches_per_epoch = 10
+batch_size = 800
+num_batches_per_epoch = 20
 num_examples = num_batches_per_epoch * batch_size
 
-valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(10, 10)
+valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(20, 20)
 
 batch_data = []
 for batch_id in range(num_batches_per_epoch):
@@ -140,7 +140,7 @@ print("*** STARTING TRAINING SESSION ***")
 
 tfconfig = tf.ConfigProto(
     device_count = {
-        'GPU': 0,
+        #'GPU': 0,
         #'CPU': 8
     },
     #intra_op_parallelism_threads = 16,
@@ -148,9 +148,14 @@ tfconfig = tf.ConfigProto(
     log_device_placement = False,
     #allow_soft_placement = True
 )
+
+min_valid_cost = 1000000.0
+
 with tf.Session(graph=graph, config=tfconfig) as session:
     # Initializate the weights and biases
     tf.global_variables_initializer().run()
+
+    saver = tf.train.Saver(max_to_keep=4)
 
     for curr_epoch in range(num_epochs):
         train_cost = train_ler = 0
@@ -200,3 +205,6 @@ with tf.Session(graph=graph, config=tfconfig) as session:
 
         print('Original: "%s"' % ''.join(valid_raw_targets))
         print('Decoded:  "%s"\n' % str_decoded)
+
+        if valid_cost < min_valid_cost:
+            saver.save(session, './saved_params/tensorflow-lstm-ctc', global_step=curr_epoch)
