@@ -9,6 +9,8 @@ import sys
 
 from config import *
 
+SAVE_PREFIX = './saved_params/tensorflow-lstm-ctc'
+
 def load_batch(batch_id, batch_size):
     target_filename_tpl = 'training_set/%04d/%03d.txt'
     audio_filename_tpl  = 'training_set/%04d/%03d.wav'
@@ -114,7 +116,7 @@ with graph.as_default():
 
     # Old learning rate = 0.0002
     # Treshold = 2.0 step clipping (gradient clipping?)
-    optimizer = tf.train.AdamOptimizer(0.01, 0.9, 0.999, 0.1).minimize(cost)
+    optimizer = tf.train.AdamOptimizer(0.001, 0.9, 0.999, 0.1).minimize(cost)
 
     #decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
     decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len, beam_width=10)
@@ -156,6 +158,16 @@ with tf.Session(graph=graph, config=tfconfig) as session:
     tf.global_variables_initializer().run()
 
     saver = tf.train.Saver(max_to_keep=4)
+
+    try:
+        #saver.recover_last_checkpoints(SAVE_PREFIX)
+        saver.restore(session, SAVE_PREFIX + "-169")
+        print("Model restored.")
+    except Exception as e:
+        print("Could not restore model: " + str(e))
+    
+    #exit()
+
 
     for curr_epoch in range(num_epochs):
         train_cost = train_ler = 0
@@ -207,4 +219,5 @@ with tf.Session(graph=graph, config=tfconfig) as session:
         print('Decoded:  "%s"\n' % str_decoded)
 
         if valid_cost < min_valid_cost:
-            saver.save(session, './saved_params/tensorflow-lstm-ctc', global_step=curr_epoch)
+            saver.save(session, SAVE_PREFIX, global_step=curr_epoch)
+            min_valid_cost = valid_cost
