@@ -6,6 +6,7 @@ import tensorflow as tf
 import scipy.io.wavfile as wav
 import numpy as np
 import sys
+import matplotlib.pyplot as plt
 
 from config import *
 
@@ -30,7 +31,10 @@ def load_batch(batch_id, batch_size):
 
         # Input shape is [num_batches, time_steps, CHUNK (features)]
         inputs = np.reshape(audio[:truncated_autio_length],  (time_steps, CHUNK))
-        inputs = (inputs - np.mean(inputs)) / np.std(inputs)
+        inputs = (inputs - np.mean(inputs)) / np.std(inputs) # Normalization
+        #inputs = np.fft.rfft(inputs)[:,16:23] # FFT
+        #plt.imshow(np.absolute(inputs))
+        #plt.show()
 
         train_inputs_.append(inputs)
         sys.stdout.write("Loading batch %d: %d... \r" % (batch_id, i))
@@ -74,19 +78,21 @@ def load_batch(batch_id, batch_size):
 # Build the network
 
 num_epochs = 2000
-num_hidden = 128
-num_units = 128
-num_layers = 1
-initial_learning_rate = 1e-2
-momentum = 0.9
 
 graph = tf.Graph()
 with graph.as_default():
+
+    ####################################################################
+    # INPUT
+    #
+    # -VVV- [max_stepsize, batch_size, CHUNK]
+
     # Has size [max_stepsize, batch_size, CHUNK], but the
     # batch_size and max_stepsize can vary along each step
     # Note chat CHUNK is the size of the audio data chunk processed
     # at each step, which is the number of input features.
-    inputs = tf.placeholder(tf.float32, [None, None, CHUNK])
+    inputs = tf.placeholder(tf.float32, [None, None, CHUNK]) # Capital I looks like a pipe section.
+    I = inputs
 
     # Here we use sparse_placeholder that will generate a
     # SparseTensor required by ctc_loss op.
@@ -95,31 +101,71 @@ with graph.as_default():
     # 1d array of size [batch_size]
     seq_len = tf.placeholder(tf.int32, [None])
 
-    lstmbfc = tf.contrib.rnn.LSTMBlockFusedCell(num_units) # Creates a factory
-    outputs, final_state = lstmbfc(inputs, initial_state=None, dtype=tf.float32) # Actually retrieves the output. Clever.
+    # Batch size
+    batch_s = tf.placeholder(tf.int32)
 
-    shape = tf.shape(inputs)
-    max_timesteps, batch_s = shape[0], shape[1]
+    ####################################################################
+    # INPUT DENSE BAND
+    #
+    # -^^^- [max_stepsize, batch_size, CHUNK]
+    I = tf.reshape(I, [-1, CHUNK])
+    # -VVV- [max_stepsize * batch_size, CHUNK]
 
-    # Reshaping to apply the same weights over the timesteps
-    outputs = tf.reshape(outputs, [-1, num_hidden])
 
-    # Doing the affine projection
-    logits = tf.layers.dense(outputs, NUM_CLASSES, activation=tf.nn.relu)
+    I = tf.layers.dense(
+        I,
+        128,
+        kernel_initializer = tf.orthogonal_initializer(1.0),
+        bias_initializer = tf.zeros_initializer(),
+        activation=tf.nn.relu
+    )
 
-    # Reshaping back to the original shape
-    logits = tf.reshape(logits, [-1, batch_s, NUM_CLASSES])
+    ####################################################################
+    # RECURRENT BAND
+    #
+    # -^^^- [max_stepsize * batch_size, 128]
+    I = tf.reshape(I, [-1, batch_s, 128])
+    # -VVV- [max_stepsize, batch_size, 128]
+
+    lstmbfc = tf.contrib.rnn.LSTMBlockFusedCell(128) # Creates a factory
+    I, _ = lstmbfc(I, initial_state=None, dtype=tf.float32) # Actually retrieves the output. Clever.
+    print(lstmbfc.weights)
+
+    shape = tf.shape(I)
+
+    ####################################################################
+    # OUTPUT DENSE BAND
+    #
+    # -^^^- [max_stepsize, batch_size, 128]
+    I = tf.reshape(I, [-1, 128])
+    # -VVV- [max_stepsize * batch_size, 128]
+
+    I = tf.layers.dense(
+        I,
+        NUM_CLASSES,
+        kernel_initializer = tf.orthogonal_initializer(1.0),
+        bias_initializer = tf.zeros_initializer(),
+        activation=tf.nn.relu
+    )
+
+    ####################################################################
+    # OUTPUT
+    #
+    # -^^^- [max_stepsize * batch_size, NUM_CLASSES]
+    I = tf.reshape(I, [-1, batch_s, NUM_CLASSES])
+    # -VVV- [max_stepsize, batch_size, NUM_CLASSES]
+
 
     # ctc_loss is by default time major
-    loss = tf.nn.ctc_loss(targets, logits, seq_len)
+    loss = tf.nn.ctc_loss(targets, I, seq_len)
     cost = tf.reduce_mean(loss)
 
     # Old learning rate = 0.0002
     # Treshold = 2.0 step clipping (gradient clipping?)
-    optimizer = tf.train.AdamOptimizer(0.001, 0.9, 0.999, 0.1).minimize(cost)
+    optimizer = tf.train.AdamOptimizer(0.01, 0.9, 0.999, 0.1).minimize(cost)
 
-    #decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
-    decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len, beam_width=10)
+    #decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
+    decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
 
     # Inaccuracy: label error rate
     ler = tf.reduce_mean(
@@ -128,21 +174,22 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-batch_size = 800
-num_batches_per_epoch = 20
-num_examples = num_batches_per_epoch * batch_size
+train_batch_size = 500
+valid_batch_size = 20
+num_batches_per_epoch = 1
+num_examples = num_batches_per_epoch * train_batch_size
 
-valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(20, 20)
+valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(20, valid_batch_size)
 
 batch_data = []
 for batch_id in range(num_batches_per_epoch):
-    batch_data.append(load_batch(batch_id, batch_size))
+    batch_data.append(load_batch(batch_id, train_batch_size))
 
 print("*** STARTING TRAINING SESSION ***")
 
 tfconfig = tf.ConfigProto(
     device_count = {
-        #'GPU': 0,
+        'GPU': 0,
         #'CPU': 8
     },
     #intra_op_parallelism_threads = 16,
@@ -161,7 +208,7 @@ with tf.Session(graph=graph, config=tfconfig) as session:
 
     try:
         #saver.recover_last_checkpoints(SAVE_PREFIX)
-        saver.restore(session, SAVE_PREFIX + "-169")
+        #saver.restore(session, SAVE_PREFIX + "-169")
         print("Model restored.")
     except Exception as e:
         print("Could not restore model: " + str(e))
@@ -182,12 +229,13 @@ with tf.Session(graph=graph, config=tfconfig) as session:
             feed = {
                 inputs: train_inputs,
                 targets: train_targets,
-                seq_len: train_seq_len
+                seq_len: train_seq_len,
+                batch_s: train_batch_size
             }
 
             batch_cost, _ = session.run([cost, optimizer], feed)
-            train_cost   += batch_cost*batch_size
-            train_ler    += session.run(ler, feed_dict=feed)*batch_size
+            train_cost   += batch_cost * train_batch_size
+            train_ler    += session.run(ler, feed_dict=feed) * train_batch_size
 
             a = int((batch_id / num_batches_per_epoch) * 50)
             sys.stdout.write("[" + ("="*a) + ">" + " "*(50-a) + "] " + ("%.2f" % (time.time()-bstart)) + "s   \r")
@@ -198,7 +246,8 @@ with tf.Session(graph=graph, config=tfconfig) as session:
         valid_feed = {
             inputs: valid_inputs,
             targets: valid_targets,
-            seq_len: valid_seq_len
+            seq_len: valid_seq_len,
+            batch_s: valid_batch_size
         }
         valid_cost, valid_ler = session.run([cost, ler], valid_feed)
 
