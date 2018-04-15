@@ -77,7 +77,7 @@ def load_batch(batch_id, batch_size):
 
 # Build the network
 
-num_epochs = 2000
+num_epochs = 10000
 
 graph = tf.Graph()
 with graph.as_default():
@@ -108,28 +108,27 @@ with graph.as_default():
     # INPUT DENSE BAND
     #
     # -^^^- [max_stepsize, batch_size, CHUNK]
-    I = tf.reshape(I, [-1, CHUNK])
+    #I = tf.reshape(I, [-1, CHUNK])
     # -VVV- [max_stepsize * batch_size, CHUNK]
 
 
-    I = tf.layers.dense(
-        I,
-        128,
-        kernel_initializer = tf.orthogonal_initializer(1.0),
-        bias_initializer = tf.zeros_initializer(),
-        activation=tf.nn.relu
-    )
+    #I = tf.layers.dense(
+    #    I,
+    #    256,
+    #    kernel_initializer = tf.orthogonal_initializer(1.0),
+    #    bias_initializer = tf.zeros_initializer(),
+    #    activation=tf.nn.relu
+    #)
 
     ####################################################################
     # RECURRENT BAND
     #
     # -^^^- [max_stepsize * batch_size, 128]
-    I = tf.reshape(I, [-1, batch_s, 128])
+    #I = tf.reshape(I, [-1, batch_s, 256])
     # -VVV- [max_stepsize, batch_size, 128]
 
-    lstmbfc = tf.contrib.rnn.LSTMBlockFusedCell(128) # Creates a factory
+    lstmbfc = tf.contrib.rnn.LSTMBlockFusedCell(256) # Creates a factory
     I, _ = lstmbfc(I, initial_state=None, dtype=tf.float32) # Actually retrieves the output. Clever.
-    print(lstmbfc.weights)
 
     shape = tf.shape(I)
 
@@ -137,7 +136,7 @@ with graph.as_default():
     # OUTPUT DENSE BAND
     #
     # -^^^- [max_stepsize, batch_size, 128]
-    I = tf.reshape(I, [-1, 128])
+    I = tf.reshape(I, [-1, 256])
     # -VVV- [max_stepsize * batch_size, 128]
 
     I = tf.layers.dense(
@@ -164,8 +163,8 @@ with graph.as_default():
     # Treshold = 2.0 step clipping (gradient clipping?)
     optimizer = tf.train.AdamOptimizer(0.01, 0.9, 0.999, 0.1).minimize(cost)
 
-    #decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
-    decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
+    decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
+    #decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
 
     # Inaccuracy: label error rate
     ler = tf.reduce_mean(
@@ -174,9 +173,9 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-train_batch_size = 500
+train_batch_size = 800
 valid_batch_size = 20
-num_batches_per_epoch = 1
+num_batches_per_epoch = 20
 num_examples = num_batches_per_epoch * train_batch_size
 
 valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(20, valid_batch_size)
@@ -208,7 +207,7 @@ with tf.Session(graph=graph, config=tfconfig) as session:
 
     try:
         #saver.recover_last_checkpoints(SAVE_PREFIX)
-        #saver.restore(session, SAVE_PREFIX + "-169")
+        #saver.restore(session, SAVE_PREFIX + "-871")
         print("Model restored.")
     except Exception as e:
         print("Could not restore model: " + str(e))
