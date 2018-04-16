@@ -157,7 +157,12 @@ with graph.as_default():
 
     # ctc_loss is by default time major
     loss = tf.nn.ctc_loss(targets, I, seq_len)
-    cost = tf.reduce_mean(loss)
+
+    # Regularization
+    lambda_l2_reg = 0.005
+    reg_loss = [ tf.nn.l2_loss(tf_var) for tf_var in tf.trainable_variables() if not ("noreg" in tf_var.name or "Bias" in tf_var.name) ]
+
+    cost = tf.reduce_mean(loss) + lambda_l2_reg * tf.reduce_sum(reg_loss)
 
     # Old learning rate = 0.0002
     # Treshold = 2.0 step clipping (gradient clipping?)
@@ -173,9 +178,9 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-train_batch_size = 800
-valid_batch_size = 20
-num_batches_per_epoch = 20
+train_batch_size = 200
+valid_batch_size = 10
+num_batches_per_epoch = 1
 num_examples = num_batches_per_epoch * train_batch_size
 
 valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(20, valid_batch_size)
