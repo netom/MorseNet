@@ -127,8 +127,9 @@ with graph.as_default():
     #I = tf.reshape(I, [-1, batch_s, 256])
     # -VVV- [max_stepsize, batch_size, 128]
 
-    lstmbfc = tf.contrib.rnn.LSTMBlockFusedCell(256) # Creates a factory
-    I, _ = lstmbfc(I, initial_state=None, dtype=tf.float32) # Actually retrieves the output. Clever.
+    with tf.variable_scope("", initializer=tf.orthogonal_initializer(0.9)):
+        lstmbfc = tf.contrib.rnn.LSTMBlockFusedCell(128) # Creates a factory
+        I, _ = lstmbfc(I, initial_state=None, dtype=tf.float32) # Actually retrieves the output. Clever.
 
     shape = tf.shape(I)
 
@@ -136,7 +137,7 @@ with graph.as_default():
     # OUTPUT DENSE BAND
     #
     # -^^^- [max_stepsize, batch_size, 128]
-    I = tf.reshape(I, [-1, 256])
+    I = tf.reshape(I, [-1, 128])
     # -VVV- [max_stepsize * batch_size, 128]
 
     I = tf.layers.dense(
@@ -160,7 +161,7 @@ with graph.as_default():
 
     # Regularization
     lambda_l2_reg = 0.005
-    reg_loss = [ tf.nn.l2_loss(tf_var) for tf_var in tf.trainable_variables() if not ("noreg" in tf_var.name or "Bias" in tf_var.name) ]
+    reg_loss = [ tf.nn.l2_loss(tf_var) for tf_var in tf.trainable_variables() if not ("bias" in tf_var.name) ]
 
     cost = tf.reduce_mean(loss) + lambda_l2_reg * tf.reduce_sum(reg_loss)
 
@@ -168,8 +169,8 @@ with graph.as_default():
     # Treshold = 2.0 step clipping (gradient clipping?)
     optimizer = tf.train.AdamOptimizer(0.01, 0.9, 0.999, 0.1).minimize(cost)
 
-    decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
-    #decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
+    #decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
+    decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
 
     # Inaccuracy: label error rate
     ler = tf.reduce_mean(
@@ -178,7 +179,7 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-train_batch_size = 200
+train_batch_size = 100
 valid_batch_size = 10
 num_batches_per_epoch = 1
 num_examples = num_batches_per_epoch * train_batch_size
@@ -208,6 +209,15 @@ with tf.Session(graph=graph, config=tfconfig) as session:
     # Initializate the weights and biases
     tf.global_variables_initializer().run()
 
+    # The default initializer for the lstm is random uniform
+    # We can do better with a slightly contracting orthogonal one.
+    #extra_init = None
+    #for tf_var in tf.trainable_variables():
+    #    if tf_var.name == 'lstm_fused_cell/kernel:0':
+    #        print("*** GOTCHA ***")
+    #        print(tf_var.initializer)
+    #        extra_init = tf_var.initializer
+
     saver = tf.train.Saver(max_to_keep=4)
 
     try:
@@ -217,8 +227,13 @@ with tf.Session(graph=graph, config=tfconfig) as session:
     except Exception as e:
         print("Could not restore model: " + str(e))
     
-    #exit()
+    #for tf_var in tf.trainable_variables():
+    #    print(tf_var.name + " " + str(tf_var.eval()))
 
+    #session.run(extra_init)
+
+    #for tf_var in tf.trainable_variables():
+    #    print(tf_var.name + " " + str(tf_var.eval()))
 
     for curr_epoch in range(num_epochs):
         train_cost = train_ler = 0
