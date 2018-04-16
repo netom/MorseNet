@@ -167,7 +167,11 @@ with graph.as_default():
 
     # Old learning rate = 0.0002
     # Treshold = 2.0 step clipping (gradient clipping?)
-    optimizer = tf.train.AdamOptimizer(0.01, 0.9, 0.999, 0.1).minimize(cost)
+    #optimizer = tf.train.AdamOptimizer(0.01, 0.9, 0.999, 0.1).minimize(cost)
+    optimizer = tf.train.AdamOptimizer()
+    gvs = optimizer.compute_gradients(cost)
+    capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
+    train_op = optimizer.apply_gradients(capped_gvs)
 
     #decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
     decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
@@ -179,9 +183,9 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-train_batch_size = 100
+train_batch_size = 300
 valid_batch_size = 10
-num_batches_per_epoch = 1
+num_batches_per_epoch = 3
 num_examples = num_batches_per_epoch * train_batch_size
 
 valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(20, valid_batch_size)
@@ -252,7 +256,7 @@ with tf.Session(graph=graph, config=tfconfig) as session:
                 batch_s: train_batch_size
             }
 
-            batch_cost, _ = session.run([cost, optimizer], feed)
+            batch_cost, _ = session.run([cost, train_op], feed)
             train_cost   += batch_cost * train_batch_size
             train_ler    += session.run(ler, feed_dict=feed) * train_batch_size
 
