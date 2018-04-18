@@ -138,13 +138,16 @@ def cw_model(features, labels, mode, params):
 
 
     # ctc_loss is by default time major
-    loss = tf.nn.ctc_loss(labels, I, seq_len)
+    ctc_loss = tf.reduce_mean(tf.nn.ctc_loss(labels, I, seq_len))
+    tf.summary.scalar('ctc_loss', ctc_loss)
 
     # Regularization
     lambda_l2_reg = 0.005
-    reg_loss = [ tf.nn.l2_loss(tf_var) for tf_var in tf.trainable_variables() if not ("bias" in tf_var.name) ]
+    reg_loss = lambda_l2_reg * tf.reduce_sum([ tf.nn.l2_loss(tf_var) for tf_var in tf.trainable_variables() if not ("bias" in tf_var.name) ])
+    tf.summary.scalar('reg_loss', reg_loss)
 
-    loss = tf.reduce_mean(loss) + lambda_l2_reg * tf.reduce_sum(reg_loss)
+    loss = ctc_loss + reg_loss
+    tf.summary.scalar('loss', loss)
 
     # Old learning rate = 0.0002
     # Treshold = 2.0 step clipping (gradient clipping?)
@@ -183,8 +186,8 @@ def main(args):
     print("*** LOADING DATA ***")
 
     num_epochs = 10000
-    train_batch_size = 100
-    valid_batch_size = 100
+    train_batch_size = 500
+    valid_batch_size = 500
     num_batches_per_epoch = 1
     num_examples = num_batches_per_epoch * train_batch_size
 
@@ -203,7 +206,7 @@ def main(args):
 
     estimator = tf.estimator.Estimator(
         model_fn=cw_model,
-        #config=tfconfig,
+        model_dir='./model_dir',
         params={
             'max_timesteps': MAX_TIMESTEPS,
             'batch_size': train_batch_size,
