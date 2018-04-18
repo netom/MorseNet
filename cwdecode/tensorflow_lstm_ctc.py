@@ -131,8 +131,6 @@ with graph.as_default():
         lstmbfc = tf.contrib.rnn.LSTMBlockFusedCell(128) # Creates a factory
         I, _ = lstmbfc(I, initial_state=None, dtype=tf.float32) # Actually retrieves the output. Clever.
 
-    shape = tf.shape(I)
-
     ####################################################################
     # OUTPUT DENSE BAND
     #
@@ -183,9 +181,9 @@ with graph.as_default():
 
 print("*** LOADING DATA ***")
 
-train_batch_size = 300
+train_batch_size = 100
 valid_batch_size = 10
-num_batches_per_epoch = 3
+num_batches_per_epoch = 1
 num_examples = num_batches_per_epoch * train_batch_size
 
 valid_inputs, valid_seq_len, valid_targets, valid_raw_targets = load_batch(20, valid_batch_size)

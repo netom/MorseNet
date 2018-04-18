@@ -17,8 +17,9 @@ NUM_BATCHES = 21
 BATCH_SIZE = 1000
 
 # The size of a sample in chunks
-MIN_SEQ_LENGTH = FRAMERATE * 12
-MAX_SEQ_LENGTH = FRAMERATE * 18
+MIN_SEQ_LENGTH = (FRAMERATE * 12) // CHUNK * CHUNK
+MAX_SEQ_LENGTH = MIN_SEQ_LENGTH
+MAX_TIMESTEPS = MIN_SEQ_LENGTH // CHUNK
 
 # The directory in wich the examples are saved
 TRAINING_SET_DIR = 'training_set'
