@@ -70,7 +70,7 @@ def load_batch(batch_id, batch_size):
         (batch_size, max_target_len)
     )
 
-    return train_inputs_, train_seq_len_, train_targets_, raw_targets_
+    return train_inputs_, train_targets_
 
 def cw_model(features, labels, mode, params):
     ####################################################################
@@ -185,13 +185,13 @@ def cw_model(features, labels, mode, params):
 def main(args):
     print("*** LOADING DATA ***")
 
-    num_epochs = 10000
+    num_epochs = 100000
     train_batch_size = 500
     valid_batch_size = 500
     num_batches_per_epoch = 1
     num_examples = num_batches_per_epoch * train_batch_size
 
-    features, seq_len, labels, valid_raw_targets = load_batch(20, valid_batch_size)
+    features, labels = load_batch(0, valid_batch_size)
 
     tfconfig = tf.ConfigProto(
         device_count = {
@@ -217,7 +217,7 @@ def main(args):
     # Train the Model.
     estimator.train(
         input_fn=lambda:tf.data.Dataset.from_tensors((features, labels)).repeat(),
-        steps=10000
+        steps=100000
     )
 
     # Evaluate the model.
