@@ -172,7 +172,7 @@ def cw_model(features, labels, mode, params):
         }
         return tf.estimator.EstimatorSpec(mode, predictions=predictions)
 
-    metrics = {'ler': ler}
+    metrics = {'ler': (ler,ler)}
     tf.summary.scalar('ler', ler)
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(mode, loss=loss, eval_metric_ops=metrics)
@@ -191,18 +191,22 @@ def main(args):
     num_batches_per_epoch = 1
     num_examples = num_batches_per_epoch * train_batch_size
 
-    features, labels = load_batch(0, valid_batch_size)
+    labels_i = []
+    labels_v = []
+    labels_3rd = 0
+    features = []
+    for i in range(num_batches_per_epoch):
+        features_, labels_ = load_batch(i, train_batch_size)
+        features.append(features_)
+        if labels_.dense_shape[1] > labels_3rd:
+            labels_3rd = labels_.dense_shape[1]
+        for ind, val in zip(labels_.indices, labels_.values):
+            labels_i.append([i] + ind)
+            labels_v.append(val)
+    features = np.asarray(features)
+    labels = tf.SparseTensorValue(labels_i, labels_v, (num_batches_per_epoch, train_batch_size, labels_3rd))
 
-    tfconfig = tf.ConfigProto(
-        device_count = {
-            'GPU': 0,
-            #'CPU': 8
-        },
-        #intra_op_parallelism_threads = 16,
-        #inter_op_parallelism_threads = 16,
-        log_device_placement = False,
-        #allow_soft_placement = True
-    )
+    valid_features, valid_labels = load_batch(20, valid_batch_size)
 
     estimator = tf.estimator.Estimator(
         model_fn=cw_model,
@@ -216,16 +220,19 @@ def main(args):
 
     # Train the Model.
     estimator.train(
-        input_fn=lambda:tf.data.Dataset.from_tensors((features, labels)).repeat(),
-        steps=100000
+        input_fn=lambda:tf.data.Dataset.from_tensor_slices((features,labels)).repeat(),
+        #steps=10000,
+        max_steps=10000
     )
 
     # Evaluate the model.
-    #eval_result = estimator.evaluate(
-    #    input_fn=lambda:iris_data.eval_input_fn(test_x, test_y, args.batch_size)
-    #)
+    eval_result = estimator.evaluate(
+        input_fn=lambda:tf.data.Dataset.from_tensors((valid_features,valid_labels)).repeat(),
+        steps=1
+    )
 
-    #print('\nTest set accuracy: {accuracy:0.3f}\n'.format(**eval_result))
+    print(eval_result)
+    #print('\nTest set accuracy: {ler:0.3f}\n'.format(**eval_result))
 
 tf.logging.set_verbosity(tf.logging.INFO)
 tf.app.run(main)
