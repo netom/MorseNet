@@ -172,14 +172,25 @@ def cw_model(features, labels, mode, params):
         }
         return tf.estimator.EstimatorSpec(mode, predictions=predictions)
 
-    metrics = {'ler': (ler,ler)}
+    metrics = {
+        'ler': (ler, tf.no_op())
+    }
+
     tf.summary.scalar('ler', ler)
+
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(mode, loss=loss, eval_metric_ops=metrics)
 
     assert mode == tf.estimator.ModeKeys.TRAIN
 
-    return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)
+    return tf.estimator.EstimatorSpec(
+        mode,
+        loss=loss,
+        train_op=train_op,
+        scaffold=tf.train.Scaffold(
+            saver=tf.train.Saver(restore_sequentially=True)
+        )
+    )
 
 
 def main(args):
@@ -218,20 +229,23 @@ def main(args):
         }
     )
 
-    while True:
-        # Train the Model.
-        estimator.train(
-            input_fn=lambda:tf.data.Dataset.from_tensor_slices((features,labels)).repeat(),
-            steps=100
-        )
+    train_spec = tf.estimator.TrainSpec(
+        input_fn=lambda:tf.data.Dataset.from_tensor_slices((features,labels)).repeat(),
+        max_steps=100000
+    )
 
-        # Evaluate the model.
-        eval_result = estimator.evaluate(
-            input_fn=lambda:tf.data.Dataset.from_tensors((valid_features,valid_labels)).repeat(),
-            steps=1
-        )
+    eval_spec = tf.estimator.EvalSpec(
+        input_fn = lambda:tf.data.Dataset.from_tensors((valid_features,valid_labels)).repeat(),
+        steps=1,
+        throttle_secs=1800,
+        start_delay_secs=1800,
+    )
 
-        print(eval_result)
+    tf.estimator.train_and_evaluate(
+        estimator,
+        train_spec,
+        eval_spec
+    )
 
 tf.logging.set_verbosity(tf.logging.INFO)
 tf.app.run(main)
