@@ -91,23 +91,24 @@ def cw_model(features, labels, mode, params):
     # INPUT DENSE BAND
     #
     # -^^^- [params['max_timesteps'], params['batch_size'], params['num_features']]
-    #I = tf.reshape(I, [-1, params['num_features']])
+    I = tf.reshape(I, [-1, params['num_features']])
     # -VVV- [params['max_timesteps'] * params['batch_size'], params['num_features']]
 
 
-    #I = tf.layers.dense(
-    #    I,
-    #    256,
-    #    kernel_initializer = tf.orthogonal_initializer(1.0),
-    #    bias_initializer = tf.zeros_initializer(),
-    #    activation=tf.nn.relu
-    #)
+    I = tf.layers.dense(
+        I,
+        128,
+        kernel_initializer = tf.orthogonal_initializer(1.0),
+        bias_initializer = tf.zeros_initializer(),
+        activation=tf.nn.relu,
+        name="inputDense"
+    )
 
     ####################################################################
     # RECURRENT BAND
     #
     # -^^^- [params['max_timesteps'] * params['batch_size'], 128]
-    #I = tf.reshape(I, [params['max_timesteps'], params['batch_size'], 256])
+    I = tf.reshape(I, [params['max_timesteps'], params['batch_size'], 128])
     # -VVV- [params['max_timesteps'], params['batch_size'], 128]
 
     with tf.variable_scope("", initializer=tf.orthogonal_initializer(0.9)):
@@ -126,7 +127,8 @@ def cw_model(features, labels, mode, params):
         NUM_CLASSES,
         kernel_initializer = tf.orthogonal_initializer(1.0),
         bias_initializer = tf.zeros_initializer(),
-        activation=tf.nn.relu
+        activation=tf.nn.relu,
+        name="outputDense"
     )
 
     ####################################################################
@@ -197,9 +199,9 @@ def main(args):
     print("*** LOADING DATA ***")
 
     num_epochs = 100000
-    train_batch_size = 500
-    valid_batch_size = 500
-    num_batches_per_epoch = 5
+    train_batch_size = 100
+    valid_batch_size = 100
+    num_batches_per_epoch = 20
     num_examples = num_batches_per_epoch * train_batch_size
 
     labels_i = []
