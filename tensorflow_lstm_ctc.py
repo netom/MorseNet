@@ -73,15 +73,28 @@ def load_batch(batch_id, batch_size):
     return train_inputs_, train_targets_
 
 def cw_model(features, labels, mode, params):
+
+    p_max_timesteps         = params.get('max_timesteps')
+    p_batch_size            = params.get('batch_size')
+    p_num_features          = params.get('num_features')
+    p_input_layer_depth     = params.get('input_layer_depth')
+    p_input_layer_width     = params.get('input_layer_width')
+    p_recurrent_layer_depth = params.get('recurrent_layer_depth')
+    p_recurrent_layer_width = params.get('recurrent_layer_width')
+    p_output_layer_depth    = params.get('output_layer_depth')
+    p_output_layer_width    = params.get('output_layer_width')
+
+    is_training = mode == tf.estimator.ModeKeys.TRAIN
+
     ####################################################################
     # INPUT
     #
-    # -VVV- [params['batch_size'], params['max_timesteps'], params['num_features']]
+    # -VVV- [p_max_timesteps, p_batch_size, p_num_features]
 
-    # Has size params['batch_size'], [params['max_timesteps'], params['num_features']].
-    # Note chat params['num_features'] is the size of the audio data chunk processed
+    # Has size p_max_timesteps, [p_batch_size, p_num_features].
+    # Note chat p_num_features is the size of the audio data chunk processed
     # at each step, which is the number of input features.
-    seq_len=tf.constant(params['max_timesteps'], dtype=tf.int32, shape=[params['batch_size']])
+    seq_len=tf.constant(p_max_timesteps, dtype=tf.int32, shape=[p_batch_size])
 
     I = features
 
@@ -90,81 +103,88 @@ def cw_model(features, labels, mode, params):
     ####################################################################
     # INPUT DENSE BAND
     #
-    # -^^^- [params['batch_size'], params['max_timesteps'], params['num_features']]
-    I = tf.reshape(I, [params['batch_size'] * params['max_timesteps'], params['num_features']])
-    # -VVV- [params['batch_size'] * params['max_timesteps'], params['num_features']]
+    # -^^^- [p_max_timesteps, p_batch_size, p_num_features]
+    I = tf.reshape(I, [p_max_timesteps * p_batch_size, p_num_features])
+    # -VVV- [p_max_timesteps * p_batch_size, p_num_features]
 
-    I = tf.layers.dense(
-        I,
-        128,
-        kernel_initializer = tf.orthogonal_initializer(0.9),
-        bias_initializer = tf.zeros_initializer(),
-        activation=tf.nn.relu,
-        name="inputDense0"
-    )
-    I = tf.layers.dense(
-        I,
-        128,
-        kernel_initializer = tf.orthogonal_initializer(0.9),
-        bias_initializer = tf.zeros_initializer(),
-        activation=tf.nn.relu,
-        name="inputDense1"
-    )
+    for i in range(p_input_layer_depth):
+        I = tf.layers.dense(
+            I,
+            p_input_layer_width,
+            kernel_initializer = tf.orthogonal_initializer(1.0),
+            bias_initializer = tf.zeros_initializer(),
+            activation=None,
+            name="inputDense%d" % i
+        )
+        I = tf.contrib.layers.batch_norm(I, is_training=is_training)
+        I = tf.nn.relu(I)
+        I = tf.layers.dropout(
+            inputs=I,
+            rate=0.5,
+            training=is_training
+        )
+
 
     ####################################################################
     # RECURRENT BAND
     #
-    # -^^^- [params['batch_size'] * params['max_timesteps'], 128]
-    I = tf.reshape(I, [params['batch_size'], params['max_timesteps'], 128])
-    # -VVV- [params['batch_size'], params['max_timesteps'], 128]
+    # -^^^- [p_max_timesteps * p_batch_size, 128]
+    I = tf.reshape(I, [p_max_timesteps, p_batch_size, 128])
+    # -VVV- [p_max_timesteps, p_batch_size, 128]
 
-    with tf.variable_scope("", initializer=tf.orthogonal_initializer(0.2)):
-        #cell = tf.contrib.rnn.LayerNormBasicLSTMCell(
-        #)
-        cell = tf.nn.rnn_cell.BasicRNNCell(
-            128,
-            activation=tf.nn.tanh,
-            name="recurrent0"
-        )
-        I, _ = tf.nn.dynamic_rnn(
-            cell,
-            I,
-            sequence_length=seq_len,
-            dtype=tf.float32,
-            time_major=True
-        )
+    cells = []
+    with tf.variable_scope("", initializer=tf.orthogonal_initializer(1.0)):
+        for i in range(p_recurrent_layer_depth):
+            cells.append(tf.contrib.rnn.LayerNormBasicLSTMCell(
+                p_recurrent_layer_width,
+                forget_bias=1.0,
+                activation=tf.tanh,
+                layer_norm=True,
+                norm_gain=1.0,
+                norm_shift=0.0,
+                dropout_keep_prob=0.5 if is_training else 1.0
+            ))
+    stack = tf.contrib.rnn.MultiRNNCell(cells)
+    I, _ = tf.nn.dynamic_rnn(
+        stack,
+        I,
+        sequence_length=seq_len,
+        dtype=tf.float32,
+        time_major=True
+    )
 
     ####################################################################
     # OUTPUT DENSE BAND
     #
-    # -^^^- [params['batch_size'], params['max_timesteps'], 128]
-    I = tf.reshape(I, [params['batch_size'] * params['max_timesteps'], 128])
-    # -VVV- [params['batch_size'] * params['max_timesteps'], 128]
+    # -^^^- [p_max_timesteps, p_batch_size, 128]
+    I = tf.reshape(I, [p_max_timesteps * p_batch_size, 128])
+    # -VVV- [p_max_timesteps * p_batch_size, 128]
 
-    I = tf.layers.dense(
-        I,
-        128,
-        kernel_initializer = tf.orthogonal_initializer(0.9),
-        bias_initializer = tf.zeros_initializer(),
-        activation=tf.nn.relu,
-        name="outputDense0"
-    )
-    I = tf.layers.dense(
-        I,
-        NUM_CLASSES,
-        kernel_initializer = tf.orthogonal_initializer(0.9),
-        bias_initializer = tf.zeros_initializer(),
-        activation=tf.nn.relu,
-        name="outputDense1"
-    )
+    for i in range(p_output_layer_depth):
+        # The last layer must be NUM_CLASSES wide, previous layers can be set arbitrarily
+        _width = NUM_CLASSES if i == p_output_layer_depth - 1 else p_output_layer_width
+        I = tf.layers.dense(
+            I,
+            _width,
+            kernel_initializer = tf.orthogonal_initializer(1.0),
+            bias_initializer = tf.zeros_initializer(),
+            activation=None,
+            name="outputDense%d" % i
+        )
+        #I = tf.contrib.layers.batch_norm(I, is_training=is_training)
+        I = tf.nn.relu(I)
+        I = tf.layers.dropout(
+            inputs=I,
+            rate=0.5,
+            training=is_training
+        )
 
     ####################################################################
     # OUTPUT
     #
-    # -^^^- [params['batch_size'] * params['max_timesteps'], NUM_CLASSES]
-    I = tf.reshape(I, [params['batch_size'], params['max_timesteps'], NUM_CLASSES])
-    I = tf.transpose(I, (1, 0, 2))
-    # -VVV- [params['max_timesteps'], params['batch_size'], NUM_CLASSES]
+    # -^^^- [p_max_timesteps * p_batch_size, NUM_CLASSES]
+    I = tf.reshape(I, [p_max_timesteps, p_batch_size, NUM_CLASSES])
+    # -VVV- [p_max_timesteps, p_batch_size, NUM_CLASSES]
 
 
     # ctc_loss is by default time major
@@ -185,7 +205,10 @@ def cw_model(features, labels, mode, params):
     optimizer = tf.train.AdamOptimizer()
     gvs = optimizer.compute_gradients(loss)
     capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
-    train_op = optimizer.apply_gradients(capped_gvs, tf.train.get_global_step())
+
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        train_op = optimizer.apply_gradients(capped_gvs, tf.train.get_global_step())
 
     decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
     #decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
@@ -227,8 +250,8 @@ def main(args):
     print("*** LOADING DATA ***")
 
     num_epochs = 100000
-    train_batch_size = 100
-    valid_batch_size = 100
+    train_batch_size = 10
+    valid_batch_size = 10
     num_batches_per_epoch = 20
     num_examples = num_batches_per_epoch * train_batch_size
 
@@ -255,7 +278,13 @@ def main(args):
         params={
             'max_timesteps': MAX_TIMESTEPS,
             'batch_size': train_batch_size,
-            'num_features': CHUNK
+            'num_features': CHUNK,
+            'input_layer_depth': 2,
+            'input_layer_width': 128,
+            'recurrent_layer_depth': 1,
+            'recurrent_layer_width': 128,
+            'output_layer_depth': 1,
+            'output_layer_width': 128
         }
     )
 
@@ -267,8 +296,8 @@ def main(args):
     eval_spec = tf.estimator.EvalSpec(
         input_fn = lambda:tf.data.Dataset.from_tensors((valid_features,valid_labels)).repeat(),
         steps=1,
-        throttle_secs=1800,
-        start_delay_secs=1800,
+        throttle_secs=600,
+        start_delay_secs=600,
     )
 
     tf.estimator.train_and_evaluate(
