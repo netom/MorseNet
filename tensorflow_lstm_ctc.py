@@ -116,11 +116,11 @@ def cw_model(features, labels, mode, params):
             activation=None,
             name="inputDense%d" % i
         )
-        I = tf.contrib.layers.batch_norm(I, is_training=is_training)
+        #I = tf.contrib.layers.batch_norm(I, is_training=is_training)
         I = tf.nn.relu(I)
         I = tf.layers.dropout(
             inputs=I,
-            rate=0.5,
+            rate=0.0,
             training=is_training
         )
 
@@ -129,7 +129,7 @@ def cw_model(features, labels, mode, params):
     # RECURRENT BAND
     #
     # -^^^- [p_max_timesteps * p_batch_size, 128]
-    I = tf.reshape(I, [p_max_timesteps, p_batch_size, 128])
+    I = tf.reshape(I, [p_max_timesteps, p_batch_size, p_input_layer_width])
     # -VVV- [p_max_timesteps, p_batch_size, 128]
 
     cells = []
@@ -138,7 +138,7 @@ def cw_model(features, labels, mode, params):
             cells.append(tf.contrib.rnn.LayerNormBasicLSTMCell(
                 p_recurrent_layer_width,
                 forget_bias=1.0,
-                activation=tf.tanh,
+                activation=tf.nn.relu,
                 layer_norm=True,
                 norm_gain=1.0,
                 norm_shift=0.0,
@@ -175,7 +175,7 @@ def cw_model(features, labels, mode, params):
         I = tf.nn.relu(I)
         I = tf.layers.dropout(
             inputs=I,
-            rate=0.5,
+            rate=0.0,
             training=is_training
         )
 
@@ -250,8 +250,8 @@ def main(args):
     print("*** LOADING DATA ***")
 
     num_epochs = 100000
-    train_batch_size = 10
-    valid_batch_size = 10
+    train_batch_size = 100
+    valid_batch_size = 100
     num_batches_per_epoch = 20
     num_examples = num_batches_per_epoch * train_batch_size
 
@@ -279,8 +279,8 @@ def main(args):
             'max_timesteps': MAX_TIMESTEPS,
             'batch_size': train_batch_size,
             'num_features': CHUNK,
-            'input_layer_depth': 2,
-            'input_layer_width': 128,
+            'input_layer_depth': 0,
+            'input_layer_width': CHUNK,
             'recurrent_layer_depth': 1,
             'recurrent_layer_width': 128,
             'output_layer_depth': 1,
@@ -296,8 +296,8 @@ def main(args):
     eval_spec = tf.estimator.EvalSpec(
         input_fn = lambda:tf.data.Dataset.from_tensors((valid_features,valid_labels)).repeat(),
         steps=1,
-        throttle_secs=600,
-        start_delay_secs=600,
+        throttle_secs=1800,
+        start_delay_secs=1800,
     )
 
     tf.estimator.train_and_evaluate(
