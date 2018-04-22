@@ -76,9 +76,9 @@ def cw_model(features, labels, mode, params):
     ####################################################################
     # INPUT
     #
-    # -VVV- [params['max_timesteps'], params['batch_size'], params['num_features']]
+    # -VVV- [params['batch_size'], params['max_timesteps'], params['num_features']]
 
-    # Has size [params['max_timesteps'], params['batch_size'], params['num_features']].
+    # Has size params['batch_size'], [params['max_timesteps'], params['num_features']].
     # Note chat params['num_features'] is the size of the audio data chunk processed
     # at each step, which is the number of input features.
     seq_len=tf.constant(params['max_timesteps'], dtype=tf.int32, shape=[params['batch_size']])
@@ -90,52 +90,80 @@ def cw_model(features, labels, mode, params):
     ####################################################################
     # INPUT DENSE BAND
     #
-    # -^^^- [params['max_timesteps'], params['batch_size'], params['num_features']]
-    I = tf.reshape(I, [-1, params['num_features']])
-    # -VVV- [params['max_timesteps'] * params['batch_size'], params['num_features']]
-
+    # -^^^- [params['batch_size'], params['max_timesteps'], params['num_features']]
+    I = tf.reshape(I, [params['batch_size'] * params['max_timesteps'], params['num_features']])
+    # -VVV- [params['batch_size'] * params['max_timesteps'], params['num_features']]
 
     I = tf.layers.dense(
         I,
         128,
-        kernel_initializer = tf.orthogonal_initializer(1.0),
+        kernel_initializer = tf.orthogonal_initializer(0.9),
         bias_initializer = tf.zeros_initializer(),
         activation=tf.nn.relu,
-        name="inputDense"
+        name="inputDense0"
+    )
+    I = tf.layers.dense(
+        I,
+        128,
+        kernel_initializer = tf.orthogonal_initializer(0.9),
+        bias_initializer = tf.zeros_initializer(),
+        activation=tf.nn.relu,
+        name="inputDense1"
     )
 
     ####################################################################
     # RECURRENT BAND
     #
-    # -^^^- [params['max_timesteps'] * params['batch_size'], 128]
-    I = tf.reshape(I, [params['max_timesteps'], params['batch_size'], 128])
-    # -VVV- [params['max_timesteps'], params['batch_size'], 128]
+    # -^^^- [params['batch_size'] * params['max_timesteps'], 128]
+    I = tf.reshape(I, [params['batch_size'], params['max_timesteps'], 128])
+    # -VVV- [params['batch_size'], params['max_timesteps'], 128]
 
-    with tf.variable_scope("", initializer=tf.orthogonal_initializer(0.9)):
-        lstmbfc = tf.contrib.rnn.LSTMBlockFusedCell(128) # Creates a factory
-        I, _ = lstmbfc(I, initial_state=None, dtype=tf.float32) # Actually retrieves the output. Clever.
+    with tf.variable_scope("", initializer=tf.orthogonal_initializer(0.2)):
+        #cell = tf.contrib.rnn.LayerNormBasicLSTMCell(
+        #)
+        cell = tf.nn.rnn_cell.BasicRNNCell(
+            128,
+            activation=tf.nn.tanh,
+            name="recurrent0"
+        )
+        I, _ = tf.nn.dynamic_rnn(
+            cell,
+            I,
+            sequence_length=seq_len,
+            dtype=tf.float32,
+            time_major=True
+        )
 
     ####################################################################
     # OUTPUT DENSE BAND
     #
-    # -^^^- [params['max_timesteps'], params['batch_size'], 128]
-    I = tf.reshape(I, [params['max_timesteps'] * params['batch_size'], 128])
-    # -VVV- [params['max_timesteps'] * params['batch_size'], 128]
+    # -^^^- [params['batch_size'], params['max_timesteps'], 128]
+    I = tf.reshape(I, [params['batch_size'] * params['max_timesteps'], 128])
+    # -VVV- [params['batch_size'] * params['max_timesteps'], 128]
 
     I = tf.layers.dense(
         I,
-        NUM_CLASSES,
-        kernel_initializer = tf.orthogonal_initializer(1.0),
+        128,
+        kernel_initializer = tf.orthogonal_initializer(0.9),
         bias_initializer = tf.zeros_initializer(),
         activation=tf.nn.relu,
-        name="outputDense"
+        name="outputDense0"
+    )
+    I = tf.layers.dense(
+        I,
+        NUM_CLASSES,
+        kernel_initializer = tf.orthogonal_initializer(0.9),
+        bias_initializer = tf.zeros_initializer(),
+        activation=tf.nn.relu,
+        name="outputDense1"
     )
 
     ####################################################################
     # OUTPUT
     #
-    # -^^^- [params['max_timesteps'] * params['batch_size'], NUM_CLASSES]
-    I = tf.reshape(I, [params['max_timesteps'], params['batch_size'], NUM_CLASSES])
+    # -^^^- [params['batch_size'] * params['max_timesteps'], NUM_CLASSES]
+    I = tf.reshape(I, [params['batch_size'], params['max_timesteps'], NUM_CLASSES])
+    I = tf.transpose(I, (1, 0, 2))
     # -VVV- [params['max_timesteps'], params['batch_size'], NUM_CLASSES]
 
 
