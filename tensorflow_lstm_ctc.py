@@ -250,8 +250,8 @@ def main(args):
     print("*** LOADING DATA ***")
 
     num_epochs = 100000
-    train_batch_size = 100
-    valid_batch_size = 100
+    train_batch_size = 200
+    valid_batch_size = 200
     num_batches_per_epoch = 20
     num_examples = num_batches_per_epoch * train_batch_size
 
