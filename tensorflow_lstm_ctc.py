@@ -250,8 +250,8 @@ def main(args):
     print("*** LOADING DATA ***")
 
     num_epochs = 100000
-    train_batch_size = 200
-    valid_batch_size = 200
+    train_batch_size = 150
+    valid_batch_size = 150
     num_batches_per_epoch = 20
     num_examples = num_batches_per_epoch * train_batch_size
 
@@ -281,7 +281,7 @@ def main(args):
             'num_features': CHUNK,
             'input_layer_depth': 0,
             'input_layer_width': CHUNK,
-            'recurrent_layer_depth': 1,
+            'recurrent_layer_depth': 2,
             'recurrent_layer_width': 128,
             'output_layer_depth': 1,
             'output_layer_width': 128
