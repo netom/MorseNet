@@ -1,9 +1,9 @@
 # cwdecode
 
-Neural network research project for decoding morse code
+A neural network research project.
 
 This repository contains experimental code. The goal of this project is to investigate
-the possibility of using recurrent neural networks a connectionist temporal
+the possibility of using recurrent neural networks and connectionist temporal
 classification (CTC) for decoding morse code messages from raw audio data.
 
 Currently two of the Python scripts are useful:
@@ -26,4 +26,7 @@ function. The input is chunked raw audio.
     $ ./tensorflow_lstm_ctc.py
     ...loads some of the training data and starts training / validation cycles
 
-Training progress can be observed with tensorboard --log-dir=model_dir
+Training progress can be observed with:
+
+    $ tensorboard --log-dir=model_dir
+
