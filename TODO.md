@@ -1,9 +1,9 @@
 # TODO
 
-* Generate samples on-the-fly, without saving them to disk
-* Figure out how training works with generated samples (tensorflow
-  docs are not very good in this regard, or in any regard for that
-  matter)
+* Modify generate_wav_samples.py:
+    * Write sample fiels for listening
+    * Add cool command-line parameters
+* Bring documentation up-to-date
 * Try using some kind of feature extraction. Real-valued DFT looks
   promising, since it can radically decrease the amount of training
   data (the signal is very narrow band, only a few DFT buckets

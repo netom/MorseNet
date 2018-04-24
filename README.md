@@ -10,7 +10,13 @@ Currently two of the Python scripts are useful:
 
 ## generate_wav_samples.py
 
-Generates training samples according to information in config.py
+It is both a command-line tool for debugging and a module for generating data
+for training/validation.
+
+It's only half done yet, running from the command line generates a 100 samples.
+
+That's not very useful right now, as training is done with samples that are
+generated on the fly.
 
 ## tensorflow_lstm_ctc.py
 

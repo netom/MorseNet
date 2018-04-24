@@ -3,74 +3,12 @@
 import time
 
 import tensorflow as tf
-import scipy.io.wavfile as wav
 import numpy as np
 import sys
-import matplotlib.pyplot as plt
 
 from config import *
 
-def load_batch(batch_id, batch_size):
-    target_filename_tpl = 'training_set/%04d/%03d.txt'
-    audio_filename_tpl  = 'training_set/%04d/%03d.wav'
-
-    train_inputs_  = []
-    train_targets_ = []
-    raw_targets_   = []
-
-    # Files must be of the same length in one batch
-    for i in range(batch_size):
-        audio_filename = audio_filename_tpl % (batch_id, i)
-
-        fs, audio = wav.read(audio_filename)
-
-        time_steps = len(audio)//CHUNK
-        truncated_autio_length = time_steps * CHUNK
-
-        # Input shape is [num_batches, time_steps, CHUNK (features)]
-        inputs = np.reshape(audio[:truncated_autio_length],  (time_steps, CHUNK))
-        inputs = (inputs - np.mean(inputs)) / np.std(inputs) # Normalization
-        #inputs = np.fft.rfft(inputs)[:,16:23] # FFT
-        #plt.imshow(np.absolute(inputs))
-        #plt.show()
-
-        train_inputs_.append(inputs)
-        sys.stdout.write("Loading batch %d: %d... \r" % (batch_id, i))
-
-    train_inputs_  = np.asarray(train_inputs_, dtype=np.float32).transpose((1,0,2))
-    train_seq_len_ = np.asarray([time_steps]*batch_size, dtype=np.int32)
-
-    # Read targets
-    tt_indices  = []
-    tt_values   = []
-    max_target_len = 0
-    for i in range(batch_size):
-        target_filename = target_filename_tpl % (batch_id, i)
-
-        with open(target_filename, 'r') as f:
-            targets = list(map(lambda x: x[0], f.readlines()))
-
-        raw_targets_.append(''.join(targets))
-
-        # Transform char into index
-        targets = np.asarray([MORSE_CHR.index(x) for x in targets])
-        tlen = len(targets)
-        if  tlen > max_target_len:
-            max_target_len = tlen
-
-        # Creating sparse representation to feed the placeholder
-        for j, value in enumerate(targets):
-            tt_indices.append([i,j])
-            tt_values.append(value)
-
-    # Build a sparse matrix for training required by the ctc loss function
-    train_targets_ = tf.SparseTensorValue(
-        tt_indices,
-        np.asarray(tt_values, dtype=np.int32),
-        (batch_size, max_target_len)
-    )
-
-    return train_inputs_, train_targets_
+import generate_wav_samples as gen
 
 def cw_model(features, labels, mode, params):
 
@@ -246,28 +184,7 @@ def cw_model(features, labels, mode, params):
 def main(args):
     print("*** LOADING DATA ***")
 
-    num_epochs = 100000
-    train_batch_size = 150
-    valid_batch_size = 150
-    num_batches_per_epoch = 20
-    num_examples = num_batches_per_epoch * train_batch_size
-
-    labels_i = []
-    labels_v = []
-    labels_3rd = 0
-    features = []
-    for i in range(num_batches_per_epoch):
-        features_, labels_ = load_batch(i, train_batch_size)
-        features.append(features_)
-        if labels_.dense_shape[1] > labels_3rd:
-            labels_3rd = labels_.dense_shape[1]
-        for ind, val in zip(labels_.indices, labels_.values):
-            labels_i.append([i] + ind)
-            labels_v.append(val)
-    features = np.asarray(features)
-    labels = tf.SparseTensorValue(labels_i, labels_v, (num_batches_per_epoch, train_batch_size, labels_3rd))
-
-    valid_features, valid_labels = load_batch(20, valid_batch_size)
+    train_batch_size = 100
 
     estimator = tf.estimator.Estimator(
         model_fn=cw_model,
@@ -285,13 +202,25 @@ def main(args):
         }
     )
 
+    def input_fn(params={}):
+        return tf.data.Dataset.from_generator(
+            lambda: gen.seq_generator(MAX_SEQ_LENGTH),
+            (tf.float32, tf.int64, tf.int32, tf.int64)
+        ).map(
+            lambda a, i, v, s: (a,tf.SparseTensor(i,v,s))
+        ).batch(
+            train_batch_size # BATCH SIZE
+        ).take(
+            100    # NUMBER OF BATCHES PER EPOCH
+        )
+
     train_spec = tf.estimator.TrainSpec(
-        input_fn=lambda:tf.data.Dataset.from_tensor_slices((features,labels)).repeat(),
+        input_fn=input_fn,
         max_steps=100000
     )
 
     eval_spec = tf.estimator.EvalSpec(
-        input_fn = lambda:tf.data.Dataset.from_tensors((valid_features,valid_labels)).repeat(),
+        input_fn = input_fn,
         steps=1,
         throttle_secs=1800,
         start_delay_secs=1800,
