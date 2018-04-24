@@ -156,9 +156,9 @@ def cw_model(features, labels, mode, params):
     ####################################################################
     # OUTPUT DENSE BAND
     #
-    # -^^^- [p_max_timesteps, p_batch_size, 128]
-    I = tf.reshape(I, [p_max_timesteps * p_batch_size, 128])
-    # -VVV- [p_max_timesteps * p_batch_size, 128]
+    # -^^^- [p_max_timesteps, p_batch_size, p_recurrent_layer_width]
+    I = tf.reshape(I, [p_max_timesteps * p_batch_size, p_recurrent_layer_width])
+    # -VVV- [p_max_timesteps * p_batch_size, p_recurrent_layer_width]
 
     for i in range(p_output_layer_depth):
         # The last layer must be NUM_CLASSES wide, previous layers can be set arbitrarily
@@ -191,7 +191,7 @@ def cw_model(features, labels, mode, params):
     ctc_loss = tf.reduce_mean(tf.nn.ctc_loss(labels, I, seq_len))
     tf.summary.scalar('ctc_loss', ctc_loss)
 
-    # Regularization
+    # L2 Regularization
     lambda_l2_reg = 0.005
     reg_loss = lambda_l2_reg * tf.reduce_sum([ tf.nn.l2_loss(tf_var) for tf_var in tf.trainable_variables() if not ("bias" in tf_var.name) ])
     tf.summary.scalar('reg_loss', reg_loss)
@@ -199,9 +199,6 @@ def cw_model(features, labels, mode, params):
     loss = ctc_loss + reg_loss
     tf.summary.scalar('loss', loss)
 
-    # Old learning rate = 0.0002
-    # Treshold = 2.0 step clipping (gradient clipping?)
-    #optimizer = tf.train.AdamOptimizer(0.01, 0.9, 0.999, 0.1).minimize(loss)
     optimizer = tf.train.AdamOptimizer()
     gvs = optimizer.compute_gradients(loss)
     capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
