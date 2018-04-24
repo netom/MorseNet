@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 
-import os
-import re
-import sys
 import numpy as np
-import scipy.signal as sig
 import random
-import _pickle as cPickle
-#import matplotlib.pyplot as plt
-import scipy.io.wavfile
-import scipy.signal
+import scipy.signal as sig
+import tensorflow as tf
 
 from config import *
 
@@ -85,7 +79,7 @@ def get_onoff_data(c, wpm, deviation):
     
     return (pairs, length)
 
-def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
+def generate_seq(seq_length, framerate=FRAMERATE):
     # Words per minute
     wpm       = random.uniform(10,  40.0)
     # Error in timing
@@ -146,8 +140,8 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
         characters.append((c, i / float(framerate)))
 
     # Set up the bandpass filter
-    fil_lowpass = scipy.signal.firwin(taps, f1/(framerate/2))
-    fil_highpass = spectinvert(scipy.signal.firwin(taps, f2/(framerate/2)))
+    fil_lowpass = sig.firwin(taps, f1/(framerate/2))
+    fil_highpass = spectinvert(sig.firwin(taps, f2/(framerate/2)))
     fil_bandreject = fil_lowpass+fil_highpass
     fil_bandpass = spectinvert(fil_bandreject)
 
@@ -162,7 +156,7 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
     # Add impulse noise
     s += impulsenoise(seq_length, 4.2)
     # Filter signal
-    s = scipy.signal.lfilter(fil_bandpass, 1.0, s)
+    s = sig.lfilter(fil_bandpass, 1.0, s)
     # AGC with fast attack and slow exponential decay
     #a = 0.02  # Attack. The closer to 0 the slower.
     #d = 0.002 # Decay. The closer to 0 the slower.
@@ -187,32 +181,59 @@ def generate_seq(seq_length, framerate=FRAMERATE, sine=False):
 
     return s, characters
 
-def save_new_batch(i):
-    seq_length = int(random.uniform(MIN_SEQ_LENGTH, MAX_SEQ_LENGTH))
+# A generator yielding an audio array, and indices and lables for
+# building a sparsetensor describing labels for CTC functions
+def seq_generator(seq_length, framerate=FRAMERATE):
+    while True:
+        audio, labels = generate_seq(seq_length, framerate)
 
-    dirname = TRAINING_SET_DIR + '/%04d' % i
-    if not os.path.exists(dirname):
-        os.makedirs(dirname)
+        audio = np.reshape(audio,  (seq_length // CHUNK, CHUNK))
+        audio = (audio - np.mean(audio)) / np.std(audio) # Normalization
 
-    for j in range(BATCH_SIZE):
-        filename = dirname + '/%03d.wav' % j
+        labels = np.asarray([MORSE_CHR.index(l[0]) for l in labels])
 
-        audio, characters = generate_seq(seq_length)
+        label_indices = []
+        label_values = []
+        for i, value in enumerate(labels):
+            label_indices.append([i])
+            label_values.append(value)
 
-        scipy.io.wavfile.write(filename, FRAMERATE, audio)
+        yield (audio, label_indices, label_values, [len(labels)])
 
-        with open(dirname + '/%03d.txt' % j, 'w') as f:
-            f.write('\n'.join(map(lambda x: x[0] + ',' + str(x[1]), characters)))
+if __name__ == "__main__":
+    import os
+    import sys
+    import scipy.io.wavfile
 
-        with open(dirname + '/config.txt', 'w') as f:
-            f.write('%d' % seq_length)
+    def save_new_batch(i, num_batches):
+        seq_length = int(random.uniform(MIN_SEQ_LENGTH, MAX_SEQ_LENGTH))
 
-if not os.path.exists(TRAINING_SET_DIR):
-    os.makedirs(TRAINING_SET_DIR)
+        dirname = TRAINING_SET_DIR + '/%04d' % i
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
 
-print("Generating %d batches..." % NUM_BATCHES)
-for i in range(NUM_BATCHES):
-    sys.stdout.write("\rGenerating %d... " % i)
-    sys.stdout.flush()
-    save_new_batch(i)
-print("\ndone.\n")
+        for j in range(BATCH_SIZE):
+            w = 20
+            n = w*j//BATCH_SIZE
+            sys.stdout.write("\r%2d/%2d: [%s>%s] %4d/%4d  " % (i, num_batches, "="*n, " "*(w-n), j, BATCH_SIZE))
+            sys.stdout.flush()
+            filename = dirname + '/%03d.wav' % j
+
+            audio, characters = generate_seq(seq_length)
+
+            scipy.io.wavfile.write(filename, FRAMERATE, audio)
+
+            with open(dirname + '/%03d.txt' % j, 'w') as f:
+                f.write('\n'.join(map(lambda x: x[0] + ',' + str(x[1]), characters)))
+
+            with open(dirname + '/config.txt', 'w') as f:
+                f.write('%d' % seq_length)
+        print("")
+
+    if not os.path.exists(TRAINING_SET_DIR):
+        os.makedirs(TRAINING_SET_DIR)
+
+    print("Generating %d batches..." % NUM_BATCHES)
+    for i in range(NUM_BATCHES):
+        save_new_batch(i, NUM_BATCHES)
+    print("\ndone.\n")
