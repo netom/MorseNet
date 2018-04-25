@@ -184,18 +184,19 @@ def cw_model(features, labels, mode, params):
 def main(args):
     print("*** LOADING DATA ***")
 
-    train_batch_size = 100
+    batch_size = 100
+    num_batches_per_epoch = 100
 
     estimator = tf.estimator.Estimator(
         model_fn=cw_model,
         model_dir='./model_dir',
         params={
             'max_timesteps': MAX_TIMESTEPS,
-            'batch_size': train_batch_size,
+            'batch_size': batch_size,
             'num_features': CHUNK,
             'input_layer_depth': 0,
             'input_layer_width': CHUNK,
-            'recurrent_layer_depth': 1,
+            'recurrent_layer_depth': 2,
             'recurrent_layer_width': 128,
             'output_layer_depth': 1,
             'output_layer_width': 128
@@ -209,9 +210,11 @@ def main(args):
         ).map(
             lambda a, i, v, s: (a,tf.SparseTensor(i,v,s))
         ).batch(
-            train_batch_size # BATCH SIZE
+            batch_size # BATCH SIZE
+        ).map(
+            lambda a, l: (tf.transpose(a, (1,0,2)), l) # Switch to time major
         ).take(
-            100    # NUMBER OF BATCHES PER EPOCH
+            num_batches_per_epoch  # NUMBER OF BATCHES PER EPOCH
         ).prefetch(
             100
         )
