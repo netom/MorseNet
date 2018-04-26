@@ -183,11 +183,11 @@ def generate_seq(seq_length, framerate=FRAMERATE):
 
 # A generator yielding an audio array, and indices and lables for
 # building a sparsetensor describing labels for CTC functions
-def seq_generator(seq_length, framerate=FRAMERATE):
+def seq_generator(seq_length, framerate, chunk):
     while True:
         audio, labels = generate_seq(seq_length, framerate)
 
-        audio = np.reshape(audio,  (seq_length // CHUNK, CHUNK))
+        audio = np.reshape(audio,  (seq_length // chunk, chunk))
         audio = (audio - np.mean(audio)) / np.std(audio) # Normalization
 
         labels = np.asarray([MORSE_CHR.index(l[0]) for l in labels])
@@ -203,37 +203,46 @@ def seq_generator(seq_length, framerate=FRAMERATE):
 if __name__ == "__main__":
     import os
     import sys
+    import argparse
     import scipy.io.wavfile
 
-    def save_new_batch(i, num_batches):
-        seq_length = int(random.uniform(MIN_SEQ_LENGTH, MAX_SEQ_LENGTH))
+    def save_files(dirname, seq_length, batch_size):
 
-        dirname = TRAINING_SET_DIR + '/%04d' % i
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-        for j in range(BATCH_SIZE):
+        for i in range(batch_size):
             w = 20
-            n = w*j//BATCH_SIZE
-            sys.stdout.write("\r%2d/%2d: [%s>%s] %4d/%4d  " % (i, num_batches, "="*n, " "*(w-n), j, BATCH_SIZE))
+            n = w*i//batch_size
+            sys.stdout.write("\r[%s>%s] %4d/%4d  " % ("="*n, " "*(w-n), i, batch_size))
             sys.stdout.flush()
-            filename = dirname + '/%03d.wav' % j
+            filename = dirname + '/%03d.wav' % i
 
             audio, characters = generate_seq(seq_length)
 
             scipy.io.wavfile.write(filename, FRAMERATE, audio)
 
-            with open(dirname + '/%03d.txt' % j, 'w') as f:
+            with open(dirname + '/%03d.txt' % i, 'w') as f:
                 f.write('\n'.join(map(lambda x: x[0] + ',' + str(x[1]), characters)))
 
             with open(dirname + '/config.txt', 'w') as f:
                 f.write('%d' % seq_length)
         print("")
 
-    if not os.path.exists(TRAINING_SET_DIR):
-        os.makedirs(TRAINING_SET_DIR)
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument(
+        'dirname', metavar='DIRNAME', type=str,
+        help='name of the directory into wich the output .wav files are to be saved'
+    )
+    parser.add_argument(
+        'batchsize', metavar='BATCHSIZE', type=int,
+        help='the number of examples to generate'
+    )
+    parser.add_argument(
+        '--length', metavar='LENGTH', type=int, default=SEQ_LENGTH // FRAMERATE,
+        help='the approximate length of the samples in whole seconds'
+    )
 
-    print("Generating %d batches..." % NUM_BATCHES)
-    for i in range(NUM_BATCHES):
-        save_new_batch(i, NUM_BATCHES)
-    print("\ndone.\n")
+    args = parser.parse_args()
+
+    save_files(args.dirname, args.length * FRAMERATE, args.batchsize)

@@ -10,19 +10,9 @@ FFT_SIZE = 128 # 62.5Hz wide bins
 # Size of buffer processed by the neural network in a single step
 CHUNK = 256
 
-# The number of batches to generate
-NUM_BATCHES = 1
-
-# The size of a batch
-BATCH_SIZE = 100
-
 # The size of a sample in chunks
-MIN_SEQ_LENGTH = (FRAMERATE * 12) // CHUNK * CHUNK
-MAX_SEQ_LENGTH = MIN_SEQ_LENGTH
-MAX_TIMESTEPS = MIN_SEQ_LENGTH // CHUNK
-
-# The directory in wich the examples are saved
-TRAINING_SET_DIR = 'training_set'
+SEQ_LENGTH = (FRAMERATE * 12) // CHUNK * CHUNK
+TIMESTEPS = SEQ_LENGTH // CHUNK
 
 # The character set in canonical order
 MORSE_CHR = [' ','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','0','1','2','3','4','5','6','7','8','9', '\0']

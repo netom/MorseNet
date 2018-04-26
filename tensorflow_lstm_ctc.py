@@ -191,7 +191,7 @@ def main(args):
         model_fn=cw_model,
         model_dir='./model_dir',
         params={
-            'max_timesteps': MAX_TIMESTEPS,
+            'max_timesteps': TIMESTEPS,
             'batch_size': batch_size,
             'num_features': CHUNK,
             'input_layer_depth': 0,
@@ -205,7 +205,7 @@ def main(args):
 
     def input_fn(params={}):
         return tf.data.Dataset.from_generator(
-            lambda: gen.seq_generator(MAX_SEQ_LENGTH),
+            lambda: gen.seq_generator(SEQ_LENGTH, FRAMERATE, CHUNK),
             (tf.float32, tf.int64, tf.int32, tf.int64)
         ).map(
             lambda a, i, v, s: (a,tf.SparseTensor(i,v,s))
