@@ -24,6 +24,12 @@ def cw_model(features, labels=None, mode=tf.estimator.ModeKeys.PREDICT, params={
 
     is_training = mode == tf.estimator.ModeKeys.TRAIN
 
+    if p_max_timesteps == None:
+        p_max_timesteps
+
+    if p_batch_size == None:
+        pass
+
     ####################################################################
     # INPUT
     #
@@ -172,7 +178,7 @@ def cw_model(features, labels=None, mode=tf.estimator.ModeKeys.PREDICT, params={
         loss=loss,
         train_op=train_op,
         scaffold=tf.train.Scaffold(
-            saver=tf.train.Saver(restore_sequentially=True)
+            saver=tf.train.Saver(restore_sequentially=False)
         )
     )
 
@@ -180,7 +186,7 @@ def cw_model(features, labels=None, mode=tf.estimator.ModeKeys.PREDICT, params={
 def main(args):
     print("*** LOADING DATA ***")
 
-    batch_size = 100
+    batch_size = 1
     num_batches_per_epoch = 100
 
     estimator = tf.estimator.Estimator(
@@ -232,8 +238,26 @@ def main(args):
         train_spec,
         eval_spec
     )
+
+    # For prediction (or decoding), a separate,
+    # smaller estimator is created
+    #estimator = tf.estimator.Estimator(
+    #    model_fn=cw_model,
+    #    model_dir='./model_dir',
+    #    params={
+    #        'max_timesteps': TIMESTEPS,
+    #        'batch_size': 1,
+    #        'num_features': CHUNK,
+    #        'input_layer_depth': 0,
+    #        'input_layer_width': CHUNK,
+    #        'recurrent_layer_depth': 1,
+    #        'recurrent_layer_width': 128,
+    #        'output_layer_depth': 1,
+    #        'output_layer_width': 128
+    #    }
+    #)
     #res = estimator.predict(
-    #    input_fn=lambda: tf.data.Dataset.from_tensors((tf.zeros((37500,CHUNK), dtype=tf.float32), []))
+    #    input_fn=lambda: tf.data.Dataset.from_tensors((tf.zeros((375,CHUNK), dtype=tf.float32), []))
     #)
     #for r in res:
     #    print(r)
