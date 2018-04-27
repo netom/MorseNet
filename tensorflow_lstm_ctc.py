@@ -66,9 +66,9 @@ def cw_model(features, labels, mode, params):
     ####################################################################
     # RECURRENT BAND
     #
-    # -^^^- [p_max_timesteps * p_batch_size, 128]
+    # -^^^- [p_max_timesteps * p_batch_size, p_input_layer_width]
     I = tf.reshape(I, [p_max_timesteps, p_batch_size, p_input_layer_width])
-    # -VVV- [p_max_timesteps, p_batch_size, 128]
+    # -VVV- [p_max_timesteps, p_batch_size, p_input_layer_width]
 
     cells = []
     with tf.variable_scope("", initializer=tf.orthogonal_initializer(1.0)):
