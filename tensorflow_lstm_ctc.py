@@ -10,7 +10,7 @@ from config import *
 
 import generate_wav_samples as gen
 
-def cw_model(features, labels, mode, params):
+def cw_model(features, labels=None, mode=tf.estimator.ModeKeys.PREDICT, params={}):
 
     p_max_timesteps         = params.get('max_timesteps')
     p_batch_size            = params.get('batch_size')
@@ -35,8 +35,6 @@ def cw_model(features, labels, mode, params):
     seq_len=tf.constant(p_max_timesteps, dtype=tf.int32, shape=[p_batch_size])
 
     I = features
-
-    # labels must be a SparseTensor required by ctc_loss op.
 
     ####################################################################
     # INPUT DENSE BAND
@@ -124,6 +122,15 @@ def cw_model(features, labels, mode, params):
     I = tf.reshape(I, [p_max_timesteps, p_batch_size, NUM_CLASSES])
     # -VVV- [p_max_timesteps, p_batch_size, NUM_CLASSES]
 
+    decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
+    #decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
+
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        predictions = {
+            'decoded': tf.sparse_tensor_to_dense(decoded[0]),
+            'log_prob': log_prob
+        }
+        return tf.estimator.EstimatorSpec(mode, predictions=predictions)
 
     # ctc_loss is by default time major
     ctc_loss = tf.reduce_mean(tf.nn.ctc_loss(labels, I, seq_len))
@@ -141,24 +148,9 @@ def cw_model(features, labels, mode, params):
     gvs = optimizer.compute_gradients(loss)
     capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
 
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    with tf.control_dependencies(update_ops):
-        train_op = optimizer.apply_gradients(capped_gvs, tf.train.get_global_step())
-
-    decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
-    #decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
-
-    # Inaccuracy: label error rate
     ler = tf.reduce_mean(
         tf.edit_distance(tf.cast(decoded[0], tf.int32), labels)
     )
-
-    if mode == tf.estimator.ModeKeys.PREDICT:
-        predictions = {
-            'decoded': decoded,
-            'log_prob': log_prob
-        }
-        return tf.estimator.EstimatorSpec(mode, predictions=predictions)
 
     metrics = {
         'ler': (ler, tf.no_op())
@@ -170,6 +162,10 @@ def cw_model(features, labels, mode, params):
         return tf.estimator.EstimatorSpec(mode, loss=loss, eval_metric_ops=metrics)
 
     assert mode == tf.estimator.ModeKeys.TRAIN
+
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        train_op = optimizer.apply_gradients(capped_gvs, tf.train.get_global_step())    # Inaccuracy: label error rate
 
     return tf.estimator.EstimatorSpec(
         mode,
@@ -225,7 +221,7 @@ def main(args):
     )
 
     eval_spec = tf.estimator.EvalSpec(
-        input_fn = input_fn,
+        input_fn=input_fn,
         steps=1,
         throttle_secs=1800,
         start_delay_secs=1800,
@@ -236,6 +232,11 @@ def main(args):
         train_spec,
         eval_spec
     )
+    #res = estimator.predict(
+    #    input_fn=lambda: tf.data.Dataset.from_tensors((tf.zeros((37500,CHUNK), dtype=tf.float32), []))
+    #)
+    #for r in res:
+    #    print(r)
 
 tf.logging.set_verbosity(tf.logging.INFO)
 tf.app.run(main)
