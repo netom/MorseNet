@@ -129,8 +129,10 @@ def cw_model(features, labels=None, mode=tf.estimator.ModeKeys.PREDICT, params={
     I = tf.reshape(I, [p_max_timesteps, p_batch_size, NUM_CLASSES])
     # -VVV- [p_max_timesteps, p_batch_size, NUM_CLASSES]
 
-    decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
-    #decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
+    if is_training:
+        decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
+    else:
+        decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
         predictions = {
@@ -183,95 +185,62 @@ def cw_model(features, labels=None, mode=tf.estimator.ModeKeys.PREDICT, params={
         )
     )
 
+if __name__ == "__main__":
 
-def main(args):
-    print("*** LOADING DATA ***")
+    def main(args):
 
-    batch_size = 1
-    num_batches_per_epoch = 100
+        batch_size = 500
+        num_batches_per_epoch = 50
 
-    estimator = tf.estimator.Estimator(
-        model_fn=cw_model,
-        model_dir='./model_dir',
-        params={
-            'max_timesteps': TIMESTEPS,
-            'batch_size': batch_size,
-            'num_features': CHUNK,
-            'input_layer_depth': 0,
-            'input_layer_width': CHUNK,
-            'recurrent_layer_depth': 1,
-            'recurrent_layer_width': 128,
-            'output_layer_depth': 1,
-            'output_layer_width': 128
-        }
-    )
-
-    def input_fn(params={}):
-        return tf.data.Dataset.from_generator(
-            lambda: gen.seq_generator(SEQ_LENGTH, FRAMERATE, CHUNK),
-            (tf.float32, tf.int64, tf.int32, tf.int64)
-        ).map(
-            lambda a, i, v, s: (a,tf.SparseTensor(i,v,s))
-        ).batch(
-            batch_size # BATCH SIZE
-        ).map(
-            lambda a, l: (tf.transpose(a, (1,0,2)), l) # Switch to time major
-        ).take(
-            num_batches_per_epoch  # NUMBER OF BATCHES PER EPOCH
-        ).prefetch(
-            100
+        estimator = tf.estimator.Estimator(
+            model_fn=cw_model,
+            model_dir='./model_train',
+            params={
+                'max_timesteps': TIMESTEPS,
+                'batch_size': batch_size,
+                'num_features': CHUNK,
+                'input_layer_depth': 0,
+                'input_layer_width': CHUNK,
+                'recurrent_layer_depth': 1,
+                'recurrent_layer_width': 128,
+                'output_layer_depth': 1,
+                'output_layer_width': 128
+            }
         )
 
-    train_spec = tf.estimator.TrainSpec(
-        input_fn=input_fn,
-        max_steps=100000
-    )
+        def input_fn(params={}):
+            return tf.data.Dataset.from_generator(
+                lambda: gen.seq_generator(SEQ_LENGTH, FRAMERATE, CHUNK),
+                (tf.float32, tf.int64, tf.int32, tf.int64)
+            ).map(
+                lambda a, i, v, s: (a,tf.SparseTensor(i,v,s))
+            ).batch(
+                batch_size # BATCH SIZE
+            ).map(
+                lambda a, l: (tf.transpose(a, (1,0,2)), l) # Switch to time major
+            ).take(
+                num_batches_per_epoch  # NUMBER OF BATCHES PER EPOCH
+            ).prefetch(
+                50
+            )
 
-    eval_spec = tf.estimator.EvalSpec(
-        input_fn=input_fn,
-        steps=1,
-        throttle_secs=1800,
-        start_delay_secs=1800,
-    )
+        train_spec = tf.estimator.TrainSpec(
+            input_fn=input_fn,
+            max_steps=100000
+        )
 
-    tf.estimator.train_and_evaluate(
-        estimator,
-        train_spec,
-        eval_spec
-    )
+        eval_spec = tf.estimator.EvalSpec(
+            input_fn=input_fn,
+            steps=1,
+            throttle_secs=1800,
+            start_delay_secs=1800,
+        )
 
-    #rate, data = scipy.io.wavfile.read("test.wav")
-    #timesteps = len(data) // CHUNK
-    #data = np.asarray(data[:timesteps * CHUNK], dtype=np.float32)
-    #data = (data - np.mean(data)) / np.std(data)
-    
-    # For prediction (or decoding), a separate,
-    # smaller estimator is created
-    #estimator = tf.estimator.Estimator(
-    #    model_fn=cw_model,
-    #    model_dir='./model_dir',
-    #    params={
-    #        'max_timesteps': timesteps,
-    #        'batch_size': 1,
-    #        'num_features': CHUNK,
-    #        'input_layer_depth': 0,
-    #        'input_layer_width': CHUNK,
-    #        'recurrent_layer_depth': 1,
-    #        'recurrent_layer_width': 128,
-    #        'output_layer_depth': 1,
-    #        'output_layer_width': 128
-    #    }
-    #)
+        tf.estimator.train_and_evaluate(
+            estimator,
+            train_spec,
+            eval_spec
+        )
 
-    #def wav_input_fn():
-    #    return tf.data.Dataset.from_tensors((tf.reshape(data, (timesteps,CHUNK)), []))
-
-    #res = estimator.predict(
-    #    input_fn=wav_input_fn
-    #)
-    #for r in res:
-    #    decoded_str = list(map(lambda x: MORSE_CHR[x], r['decoded']))
-    #    print(''.join(decoded_str))
-
-tf.logging.set_verbosity(tf.logging.INFO)
-tf.app.run(main)
+    tf.logging.set_verbosity(tf.logging.INFO)
+    tf.app.run(main)

@@ -1,9 +1,9 @@
-model_dir*
 venv
-training_set
+model_use
+model_train
+__pycache__
 *.pkl
 *.pyc
 *.npz
 *.pickle
 *.wav
-__pycache__
