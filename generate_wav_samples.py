@@ -4,7 +4,6 @@
 import numpy as np
 import random
 import scipy.signal as sig
-import tensorflow as tf
 
 from config import *
 
