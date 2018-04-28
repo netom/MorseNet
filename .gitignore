@@ -5,4 +5,5 @@ training_set
 *.pyc
 *.npz
 *.pickle
+*.wav
 __pycache__

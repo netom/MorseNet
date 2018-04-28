@@ -5,6 +5,7 @@ import time
 import tensorflow as tf
 import numpy as np
 import sys
+import scipy.io.wavfile
 
 from config import *
 
@@ -239,13 +240,18 @@ def main(args):
         eval_spec
     )
 
+    #rate, data = scipy.io.wavfile.read("test.wav")
+    #timesteps = len(data) // CHUNK
+    #data = np.asarray(data[:timesteps * CHUNK], dtype=np.float32)
+    #data = (data - np.mean(data)) / np.std(data)
+    
     # For prediction (or decoding), a separate,
     # smaller estimator is created
     #estimator = tf.estimator.Estimator(
     #    model_fn=cw_model,
     #    model_dir='./model_dir',
     #    params={
-    #        'max_timesteps': TIMESTEPS,
+    #        'max_timesteps': timesteps,
     #        'batch_size': 1,
     #        'num_features': CHUNK,
     #        'input_layer_depth': 0,
@@ -256,11 +262,16 @@ def main(args):
     #        'output_layer_width': 128
     #    }
     #)
+
+    #def wav_input_fn():
+    #    return tf.data.Dataset.from_tensors((tf.reshape(data, (timesteps,CHUNK)), []))
+
     #res = estimator.predict(
-    #    input_fn=lambda: tf.data.Dataset.from_tensors((tf.zeros((375,CHUNK), dtype=tf.float32), []))
+    #    input_fn=wav_input_fn
     #)
     #for r in res:
-    #    print(r)
+    #    decoded_str = list(map(lambda x: MORSE_CHR[x], r['decoded']))
+    #    print(''.join(decoded_str))
 
 tf.logging.set_verbosity(tf.logging.INFO)
 tf.app.run(main)
