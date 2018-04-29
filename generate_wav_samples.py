@@ -5,6 +5,8 @@ import numpy as np
 import random
 import scipy.signal as sig
 
+from multiprocessing import Process, Queue
+
 from config import *
 
 # Spectral inversion for FIR filters
@@ -182,8 +184,25 @@ def generate_seq(seq_length, framerate=FRAMERATE):
 # A generator yielding an audio array, and indices and lables for
 # building a sparsetensor describing labels for CTC functions
 def seq_generator(seq_length, framerate, chunk):
+    # TODO:
+    # 
+    # start worker Process()-ses, put work onto the Queue(maxsize)
+    # q.put() q.get()
+    q = Queue(20)
+
+    def dowork():
+        while True:
+            q.put(generate_seq(seq_length, framerate))
+
+    ps = []
+    for i in range(4):
+        p = Process(target=dowork)
+        p.start()
+        ps.append(p)
+
     while True:
-        audio, labels = generate_seq(seq_length, framerate)
+        #audio, labels = generate_seq(seq_length, framerate)
+        audio, labels = q.get()
 
         audio = np.reshape(audio,  (seq_length // chunk, chunk))
         audio = (audio - np.mean(audio)) / np.std(audio) # Normalization

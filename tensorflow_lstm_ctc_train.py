@@ -212,16 +212,17 @@ if __name__ == "__main__":
             return tf.data.Dataset.from_generator(
                 lambda: gen.seq_generator(SEQ_LENGTH, FRAMERATE, CHUNK),
                 (tf.float32, tf.int64, tf.int32, tf.int64)
-            ).map(
-                lambda a, i, v, s: (a,tf.SparseTensor(i,v,s))
-            ).batch(
-                batch_size # BATCH SIZE
-            ).map(
-                lambda a, l: (tf.transpose(a, (1,0,2)), l) # Switch to time major
+            ).apply(tf.contrib.data.map_and_batch(
+                lambda a, i, v, s: (a,tf.SparseTensor(i,v,s)),
+                batch_size, # BATCH SIZE
+                num_parallel_batches=4
+            )).map(
+                lambda a, l: (tf.transpose(a, (1,0,2)), l), # Switch to time major
+                num_parallel_calls=4
             ).take(
                 num_batches_per_epoch  # NUMBER OF BATCHES PER EPOCH
             ).prefetch(
-                50
+                5
             )
 
         train_spec = tf.estimator.TrainSpec(
