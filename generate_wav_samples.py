@@ -63,7 +63,7 @@ def get_onoff_data(c, wpm, deviation):
     pairs = []
     length = 0
     if c == ' ':
-        pairs.append((0.0, wordspace_len(wpm, deviation)))
+        pairs.append((0.0, wordspace_len(wpm, deviation, random.normalvariate(6.0,1))))
         length += pairs[-1][1]
     else:
         last_symspace_len = 0
@@ -82,8 +82,7 @@ def generate_seq(seq_length, framerate=FRAMERATE):
     # Words per minute
     wpm       = random.uniform(10,  40.0)
     # Error in timing
-    deviation = random.uniform(0.0,  0.1)
-    # TODO: dit / dah / space weights
+    deviation = random.uniform(0.0,  0.2)
     # White noise volime
     wnvol     = random.uniform(0.5,  3.0)
     # QSB volume: 0=no qsb, 1: full silencing QSB
