@@ -7,3 +7,4 @@ __pycache__
 *.npz
 *.pickle
 *.wav
+*.txt
