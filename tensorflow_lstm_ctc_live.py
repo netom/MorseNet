@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import generator_stop
-
 import time
 
 # On my setup an annoying, but benign warning keeps appearing, messing
@@ -48,8 +46,12 @@ def main(args):
         }
     )
 
+    def generator():
+        while True:
+            yield (tf.reshape(data, (timesteps,CHUNK)), [])
+
     def wav_input_fn():
-        return tf.data.Dataset.from_tensors((tf.reshape(data, (timesteps,CHUNK)), []))
+        return tf.data.Dataset.from_generator(generator, (tf.float32, tf.float32))
 
     res = estimator.predict(
         input_fn=wav_input_fn

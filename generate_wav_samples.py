@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 
+from __future__ import generator_stop
+
 import numpy as np
 import random
 import scipy.signal as sig

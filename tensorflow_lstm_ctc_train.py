@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from __future__ import generator_stop
+
 import time
 
 import tensorflow as tf
