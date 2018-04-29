@@ -195,7 +195,7 @@ def seq_generator(seq_length, framerate, chunk):
             q.put(generate_seq(seq_length, framerate))
 
     ps = []
-    for i in range(4):
+    for i in range(2):
         p = Process(target=dowork)
         p.start()
         ps.append(p)
