@@ -215,14 +215,14 @@ if __name__ == "__main__":
             ).apply(tf.contrib.data.map_and_batch(
                 lambda a, i, v, s: (a,tf.SparseTensor(i,v,s)),
                 batch_size, # BATCH SIZE
-                num_parallel_batches=4
+                num_parallel_batches=2
             )).map(
                 lambda a, l: (tf.transpose(a, (1,0,2)), l), # Switch to time major
-                num_parallel_calls=4
+                num_parallel_calls=2
             ).take(
                 num_batches_per_epoch  # NUMBER OF BATCHES PER EPOCH
             ).prefetch(
-                5
+                3
             )
 
         train_spec = tf.estimator.TrainSpec(
