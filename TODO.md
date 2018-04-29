@@ -1,5 +1,6 @@
 # TODO
 
+* Accuracy instead of lexical error rate
 * Decoding real-time audio data
 * Try using some kind of feature extraction. Real-valued DFT looks
   promising, since it can radically decrease the amount of training
