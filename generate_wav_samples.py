@@ -38,7 +38,7 @@ def chrspace_len(wpm, deviation, chrw = 3.0):
     return int(chrw * dit_len(wpm, deviation))
 
 # The length of a space between two words
-def wordspace_len(wpm, deviation, wsw = 7.0):
+def wordspace_len(wpm, deviation, wsw = 6.0):
     return int(wsw * dit_len(wpm, deviation))
 
 # Generates <frames> length of white noise 
@@ -67,7 +67,7 @@ def get_onoff_data(c, wpm, deviation):
     pairs = []
     length = 0
     if c == ' ':
-        pairs.append((0.0, wordspace_len(wpm, deviation, random.normalvariate(6.0,1))))
+        pairs.append((0.0, wordspace_len(wpm, deviation)))
         length += pairs[-1][1]
     else:
         last_symspace_len = 0
@@ -87,22 +87,22 @@ def generate_seq(seq_length, framerate=FRAMERATE):
     wpm       = random.uniform(10,  40.0)
     # Error in timing
     deviation = random.uniform(0.0,  0.2)
-    # White noise volime
-    wnvol     = random.uniform(0.5,  3.0)
+    # White noise volume
+    wnvol     = random.uniform(0.3,  4.0)
     # QSB volume: 0=no qsb, 1: full silencing QSB
     qsbvol    = random.uniform(0.0,  0.7)
     # QSB frequency in Hertz
     qsbf      = random.uniform(0.1,  0.7)
     # Signal volume
-    sigvol    = random.uniform(1.0,  3.3)
+    sigvol    = random.uniform(1.0,  4.0)
     # Signal frequency
-    sigf      = random.uniform(590.0, 610.0)
+    sigf      = random.uniform(500.0, 700.0)
     # Signal phase
     phase     = random.uniform(0.0,  framerate / sigf)
     # Filter lower cutoff
-    f1        = random.uniform(sigf - 220, sigf - 180)
+    f1        = random.uniform(sigf - 400, sigf - 100)
     # Filter higher cutoff
-    f2        = random.uniform(sigf + 180, sigf + 220)
+    f2        = random.uniform(sigf + 100, sigf + 400)
     # Number of taps in the filter
     taps      = 63 # The number of taps of the FIR filter
 
@@ -183,24 +183,30 @@ def generate_seq(seq_length, framerate=FRAMERATE):
 
     return s, characters
 
+# List of worker processes
+processes = []
+
 # A generator yielding an audio array, and indices and lables for
 # building a sparsetensor describing labels for CTC functions
 def seq_generator(seq_length, framerate, chunk):
-    # TODO:
-    # 
-    # start worker Process()-ses, put work onto the Queue(maxsize)
-    # q.put() q.get()
-    q = Queue(20)
+    global processes
+
+    for p in processes:
+        p.terminate()
+        p.join()
+    processes = []
+
+    q = Queue(10)
 
     def dowork():
         while True:
             q.put(generate_seq(seq_length, framerate))
 
-    ps = []
     for i in range(2):
         p = Process(target=dowork)
+        p.daemon=True
+        processes.append(p)
         p.start()
-        ps.append(p)
 
     while True:
         #audio, labels = generate_seq(seq_length, framerate)
