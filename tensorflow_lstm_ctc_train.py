@@ -134,7 +134,7 @@ def cw_model(features, labels=None, mode=tf.estimator.ModeKeys.PREDICT, params={
     if is_training:
         decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
     else:
-        decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=10)
+        decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=100)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
         predictions = {
