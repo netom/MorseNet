@@ -203,7 +203,7 @@ if __name__ == "__main__":
                 'num_features': CHUNK,
                 'input_layer_depth': 0,
                 'input_layer_width': CHUNK,
-                'recurrent_layer_depth': 1,
+                'recurrent_layer_depth': 2,
                 'recurrent_layer_width': 128,
                 'output_layer_depth': 1,
                 'output_layer_width': 128
