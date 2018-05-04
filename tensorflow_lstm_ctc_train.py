@@ -183,7 +183,9 @@ def cw_model(features, labels=None, mode=tf.estimator.ModeKeys.PREDICT, params={
         loss=loss,
         train_op=train_op,
         scaffold=tf.train.Scaffold(
-            saver=tf.train.Saver(restore_sequentially=False)
+            saver=tf.train.Saver(
+                max_to_keep=30
+            )
         )
     )
 
