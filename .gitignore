@@ -1,6 +1,5 @@
 venv
-model_use
-model_train
+model_*
 __pycache__
 *.pkl
 *.pyc
