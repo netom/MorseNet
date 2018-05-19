@@ -134,7 +134,8 @@ def cw_model(features, labels=None, mode=tf.estimator.ModeKeys.PREDICT, params={
     if is_training:
         decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
     else:
-        decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=100)
+        #decoded, log_prob = tf.nn.ctc_beam_search_decoder(I, seq_len, beam_width=100)
+        decoded, log_prob = tf.nn.ctc_greedy_decoder(I, seq_len)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
         predictions = {
@@ -193,8 +194,8 @@ if __name__ == "__main__":
 
     def main(args):
 
-        batch_size = 500
-        num_batches_per_epoch = 50
+        batch_size = 250
+        num_batches_per_epoch = 60
 
         estimator = tf.estimator.Estimator(
             model_fn=cw_model,
@@ -205,7 +206,7 @@ if __name__ == "__main__":
                 'num_features': CHUNK,
                 'input_layer_depth': 0,
                 'input_layer_width': CHUNK,
-                'recurrent_layer_depth': 2,
+                'recurrent_layer_depth': 3,
                 'recurrent_layer_width': 128,
                 'output_layer_depth': 1,
                 'output_layer_width': 128
@@ -236,7 +237,7 @@ if __name__ == "__main__":
 
         eval_spec = tf.estimator.EvalSpec(
             input_fn=input_fn,
-            steps=1,
+            steps=5,
             throttle_secs=1800,
             start_delay_secs=1800,
         )
