@@ -1,4 +1,5 @@
-venv
+/venv
+/logs
 model_*
 __pycache__
 *.pkl
