@@ -12,9 +12,9 @@ from config import *
 
 
 def create_cw_model(
-    max_timesteps=TIMESTEPS,
-    num_features=CHUNK,
-    recurrent_layer_depth=3,
+    input_layer_depth=1,
+    input_layer_width=
+    recurrent_layer_depth=2,
     recurrent_layer_width=128,
     num_classes=NUM_CLASSES
 ):
@@ -28,9 +28,7 @@ def create_cw_model(
     - CTC loss applied separately in training loop
 
     Args:
-        max_timesteps: Maximum number of timesteps (None for variable length)
-        num_features: Number of features per timestep (chunk size)
-        recurrent_layer_depth: Number of LSTM layers (standardized to 3)
+        recurrent_layer_depth: Number of LSTM layers
         recurrent_layer_width: Number of units in each LSTM layer
         num_classes: Number of output classes (morse characters)
 
@@ -39,15 +37,18 @@ def create_cw_model(
     """
 
     # Input layer - audio chunks
-    input_audio = tf.keras.Input(
-        shape=(max_timesteps, num_features),
-        name='audio_input',
-        dtype=tf.float32
-    )
+    #input_audio = tf.keras.Input(
+    #    shape=(max_timesteps, num_features),
+    #    name='audio_input',
+    #    dtype=tf.float32
+    #)
+    # Input layers
+    input_dense = []
+
 
     # Recurrent layers with layer normalization
     # This replaces tf.contrib.rnn.LayerNormBasicLSTMCell from TF 1.x
-    x = input_audio
+    recurrent = []
     for i in range(recurrent_layer_depth):
         x = tf.keras.layers.LSTM(
             recurrent_layer_width,
@@ -68,22 +69,16 @@ def create_cw_model(
             name=f'layer_norm_{i}'
         )(x)
 
-    # Output dense layer - project to number of classes
-    # Linear activation for CTC (no softmax needed)
-    # Use small random initialization to prevent large initial logits
-    logits = tf.keras.layers.Dense(
+    output_dense = []
+    output_dense.append(tf.keras.layers.Dense(
         num_classes,
         activation=None,
         kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01),
         bias_initializer=tf.keras.initializers.Zeros(),
         name='output_dense'
-    )(x)
+    ))
 
-    model = tf.keras.Model(
-        inputs=input_audio,
-        outputs=logits,
-        name='cw_decoder'
-    )
+    model = tf.keras.Sequential(input_dense + recurrent + output_dense)
 
     return model
 

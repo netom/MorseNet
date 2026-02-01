@@ -305,19 +305,12 @@ def main():
 
     # Create model
     print("\nCreating model...")
-    model = create_cw_model(
-        max_timesteps=TIMESTEPS,
-        num_features=CHUNK,
-        recurrent_layer_depth=3,
-        recurrent_layer_width=128,
-        num_classes=NUM_CLASSES
-    )
+    model = create_cw_model()
 
     print("\nModel architecture:")
     model.summary()
 
-    # Create optimizer with very low learning rate for stability
-    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-5)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
     # Create trainer
     trainer = CTCTrainer(model, optimizer, CHECKPOINT_DIR, LOG_DIR)
