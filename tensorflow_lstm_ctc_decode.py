@@ -24,7 +24,7 @@ from config import *
 from model import create_cw_model, ctc_decode, decoded_to_text
 
 
-def load_model(checkpoint_dir='./model_use'):
+def load_model(checkpoint_dir='./model_train'):
     """
     Load model from checkpoint directory.
 
@@ -35,13 +35,7 @@ def load_model(checkpoint_dir='./model_use'):
         Loaded Keras model, or None if loading fails
     """
     # Create model with variable timesteps for inference
-    model = create_cw_model(
-        max_timesteps=None,  # Variable length for inference
-        num_features=CHUNK,
-        recurrent_layer_depth=3,  # STANDARDIZED to 3 layers
-        recurrent_layer_width=128,
-        num_classes=NUM_CLASSES
-    )
+    model = create_cw_model()
 
     # Find latest checkpoint
     checkpoint_dir = Path(checkpoint_dir)
@@ -167,7 +161,7 @@ def main(args):
 
     # Load model
     print("\nLoading model...")
-    model = load_model('./model_use')
+    model = load_model('./model_train')
 
     if model is None:
         print("\nError: Could not load model")
