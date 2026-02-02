@@ -63,7 +63,6 @@ def create_cw_model(
 
     return model
 
-
 def ctc_loss_fn(labels, logits, input_length, label_length, blank_index=None):
     """
     Compute CTC loss for training.
@@ -81,13 +80,9 @@ def ctc_loss_fn(labels, logits, input_length, label_length, blank_index=None):
     if blank_index is None:
         blank_index = NUM_CLASSES - 1
 
-    # Clip logits to prevent numerical instability
-    logits = tf.clip_by_value(logits, -50.0, 50.0)
-
     # CTC expects time-major format [timesteps, batch, num_classes]
     logits_transposed = tf.transpose(logits, [1, 0, 2])
 
-    # Compute CTC loss with numerical stability
     loss = tf.nn.ctc_loss(
         labels=labels,
         logits=logits_transposed,
@@ -97,11 +92,7 @@ def ctc_loss_fn(labels, logits, input_length, label_length, blank_index=None):
         blank_index=blank_index
     )
 
-    # Clip loss to prevent NaN propagation
-    loss = tf.clip_by_value(loss, 0.0, 1e10)
-
     return tf.reduce_mean(loss)
-
 
 def ctc_decode(logits, sequence_length, beam_width=100, use_beam_search=True):
     """
@@ -134,7 +125,6 @@ def ctc_decode(logits, sequence_length, beam_width=100, use_beam_search=True):
 
     return decoded, log_prob
 
-
 def decoded_to_text(decoded_sparse_tensor, character_set=MORSE_CHR):
     """
     Convert decoded sparse tensor to readable text.
@@ -162,22 +152,3 @@ def decoded_to_text(decoded_sparse_tensor, character_set=MORSE_CHR):
         result.append(text)
 
     return result
-
-
-if __name__ == "__main__":
-    # Test model creation
-    print("Testing model creation...")
-
-    model = create_cw_model(
-        max_timesteps=TIMESTEPS,
-        num_features=CHUNK,
-        recurrent_layer_depth=3,
-        recurrent_layer_width=128,
-        num_classes=NUM_CLASSES
-    )
-
-    model.summary()
-
-    print("\nModel created successfully!")
-    print(f"Input shape: [batch, {TIMESTEPS}, {CHUNK}]")
-    print(f"Output shape: [batch, {TIMESTEPS}, {NUM_CLASSES}]")

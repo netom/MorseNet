@@ -72,29 +72,6 @@ class CTCTrainer:
         else:
             print("Starting training from scratch")
 
-        # Build the optimizer by doing a dummy step
-        # This avoids issues with optimizer initialization inside @tf.function
-        self._build_optimizer()
-
-    def _build_optimizer(self):
-        """Build optimizer with a dummy forward/backward pass."""
-        # Create dummy input
-        dummy_audio = tf.zeros((1, TIMESTEPS, CHUNK), dtype=tf.float32)
-
-        # Forward pass
-        with tf.GradientTape() as tape:
-            logits = self.model(dummy_audio, training=True)
-            # Simple dummy loss
-            loss = tf.reduce_mean(logits)
-
-        # Compute gradients
-        gradients = tape.gradient(loss, self.model.trainable_variables)
-
-        # Apply gradients (this builds the optimizer)
-        self.optimizer.apply_gradients(
-            zip(gradients, self.model.trainable_variables)
-        )
-
     @tf.function
     def train_step(self, audio, labels, input_length, label_length):
         """
