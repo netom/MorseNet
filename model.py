@@ -1,82 +1,63 @@
 #!/usr/bin/env python3
 
-"""
-Morse code decoder model using TensorFlow 2.x / Keras API.
-
-This module provides the neural network architecture for decoding morse code
-from raw audio using LSTM layers and CTC (Connectionist Temporal Classification) loss.
-"""
-
 import tensorflow as tf
 from config import *
 
-
 def create_cw_model(
-    input_layer_depth=1,
-    input_layer_width=
+    max_timesteps=TIMESTEPS,
+    num_features=CHUNK,
+    num_classes=NUM_CLASSES,
+    input_layer_depth=0,
+    input_layer_width=CHUNK,
     recurrent_layer_depth=2,
     recurrent_layer_width=128,
-    num_classes=NUM_CLASSES
+    output_layer_depth=1,
+    output_layer_width=128
 ):
-    """
-    Creates a Keras model for morse code decoding using CTC.
-
-    Architecture:
-    - Input: [batch, timesteps, features] - raw audio chunks
-    - LSTM layers with layer normalization (replaces LayerNormBasicLSTMCell from TF 1.x)
-    - Dense output layer projecting to num_classes
-    - CTC loss applied separately in training loop
-
-    Args:
-        recurrent_layer_depth: Number of LSTM layers
-        recurrent_layer_width: Number of units in each LSTM layer
-        num_classes: Number of output classes (morse characters)
-
-    Returns:
-        model: tf.keras.Model instance outputting logits [batch, timesteps, num_classes]
-    """
-
-    # Input layer - audio chunks
-    #input_audio = tf.keras.Input(
-    #    shape=(max_timesteps, num_features),
-    #    name='audio_input',
-    #    dtype=tf.float32
-    #)
-    # Input layers
+    # Input dense layers
     input_dense = []
-
+    for i in range(input_layer_depth):
+        input_dense.append(tf.keras.layers.Dense(
+            input_layer_width,
+            kernel_initializer = tf.keras.initializers.Orthogonal(1.0),
+            bias_initializer = tf.keras.initializers.Zeros(),
+            activation=None,
+            name=f'input_dense_{i}'
+        ))
+        # TODO: dropout
 
     # Recurrent layers with layer normalization
     # This replaces tf.contrib.rnn.LayerNormBasicLSTMCell from TF 1.x
     recurrent = []
     for i in range(recurrent_layer_depth):
-        x = tf.keras.layers.LSTM(
+        recurrent.append(tf.keras.layers.LSTM(
             recurrent_layer_width,
-            return_sequences=True,  # Return full sequence for CTC
-            activation='tanh',  # Use tanh instead of relu for stability
+            return_sequences=True,
+            activation='tanh',
             recurrent_activation='sigmoid',
             use_bias=True,
             kernel_initializer=tf.keras.initializers.Orthogonal(gain=1.0),
             recurrent_initializer=tf.keras.initializers.Orthogonal(gain=1.0),
-            dropout=0.0,  # Disable dropout for now to avoid instability
+            dropout=0.0,
             recurrent_dropout=0.0,
             name=f'lstm_{i}'
-        )(x)
+        ))
 
-        # Layer normalization (replacement for LayerNormBasicLSTMCell layer_norm)
-        x = tf.keras.layers.LayerNormalization(
-            epsilon=1e-5,
+        recurrent.append(tf.keras.layers.LayerNormalization(
             name=f'layer_norm_{i}'
-        )(x)
+        ))
+
+        # TODO: dropout?
 
     output_dense = []
-    output_dense.append(tf.keras.layers.Dense(
-        num_classes,
-        activation=None,
-        kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01),
-        bias_initializer=tf.keras.initializers.Zeros(),
-        name='output_dense'
-    ))
+    for i in range(recurrent_layer_depth):
+        output_dense.append(tf.keras.layers.Dense(
+            num_classes,
+            activation=None,
+            kernel_initializer=tf.keras.initializers.Orthogonal(gain=1.0),
+            bias_initializer=tf.keras.initializers.Zeros(),
+            name=f'output_dense_{i}'
+        ))
 
     model = tf.keras.Sequential(input_dense + recurrent + output_dense)
 
