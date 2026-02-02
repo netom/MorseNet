@@ -36,7 +36,7 @@ except ImportError:
 class LiveDecoder:
     """Live audio decoder for morse code."""
 
-    def __init__(self, checkpoint_dir='./model_use', buffer_seconds=12):
+    def __init__(self, checkpoint_dir='./model_train', buffer_seconds=12):
         """
         Initialize live decoder.
 
