@@ -63,37 +63,6 @@ def create_cw_model(
 
     return model
 
-def ctc_loss_fn(labels, logits, input_length, label_length, blank_index=None):
-    """
-    Compute CTC loss for training.
-
-    Args:
-        labels: Sparse tensor with label sequences [batch, max_label_length]
-        logits: Model outputs [batch, timesteps, num_classes]
-        input_length: Actual length of each input sequence [batch]
-        label_length: Actual length of each label sequence [batch]
-        blank_index: Index for blank label (default: NUM_CLASSES - 1)
-
-    Returns:
-        Mean CTC loss across batch
-    """
-    if blank_index is None:
-        blank_index = NUM_CLASSES - 1
-
-    # CTC expects time-major format [timesteps, batch, num_classes]
-    logits_transposed = tf.transpose(logits, [1, 0, 2])
-
-    loss = tf.nn.ctc_loss(
-        labels=labels,
-        logits=logits_transposed,
-        label_length=label_length,
-        logit_length=input_length,
-        logits_time_major=True,
-        blank_index=blank_index
-    )
-
-    return tf.reduce_mean(loss)
-
 def ctc_decode(logits, sequence_length, beam_width=100, use_beam_search=True):
     """
     Decode CTC outputs to character sequences.

@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-#-*- coding: utf-8 -*-
-
-from __future__ import generator_stop
 
 import numpy as np
 import random
@@ -196,20 +193,19 @@ def seq_generator(seq_length, framerate, chunk):
         p.join()
     processes = []
 
-    q = Queue(10)
+    q = Queue(20)
 
     def dowork():
         while True:
             q.put(generate_seq(seq_length, framerate))
 
-    for i in range(2):
+    for i in range(10):
         p = Process(target=dowork)
         p.daemon=True
         processes.append(p)
         p.start()
 
     while True:
-        #audio, labels = generate_seq(seq_length, framerate)
         audio, labels = q.get()
 
         audio = np.reshape(audio,  (seq_length // chunk, chunk))
