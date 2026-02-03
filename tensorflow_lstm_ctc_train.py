@@ -18,17 +18,16 @@ from pathlib import Path
 
 from config import *
 import generate_wav_samples as gen
-from model import create_cw_model, ctc_loss_fn, ctc_decode
+from model import create_cw_model, ctc_decode
 
 # Training configuration
-BATCH_SIZE = 250
+BATCH_SIZE = 100
 NUM_BATCHES_PER_EPOCH = 60
 MAX_EPOCHS = 1000
 CHECKPOINT_DIR = './model_train'
 LOG_DIR = f'./logs/{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 L2_LAMBDA = 0.005
 GRADIENT_CLIP_NORM = 1.0
-
 
 class CTCTrainer:
     """Custom training class for CTC model with checkpoint management."""
@@ -72,7 +71,7 @@ class CTCTrainer:
         else:
             print("Starting training from scratch")
 
-    @tf.function
+    @tf.function(reduce_retracing=True)
     def train_step(self, audio, labels, input_length, label_length):
         """
         Single training step with automatic differentiation.
@@ -87,16 +86,16 @@ class CTCTrainer:
             Tuple of (total_loss, ctc_loss, l2_loss, ler)
         """
         with tf.GradientTape() as tape:
-            # Forward pass
             logits = self.model(audio, training=True)
 
-            # CTC loss
-            ctc_loss = ctc_loss_fn(
+            ctc_loss = tf.reduce_mean(tf.nn.ctc_loss(
                 labels=labels,
                 logits=logits,
-                input_length=input_length,
-                label_length=label_length
-            )
+                label_length=label_length,
+                logit_length=input_length,
+                logits_time_major=False,
+                blank_index=NUM_CLASSES-1
+            ))
 
             # L2 regularization (exclude bias terms)
             l2_loss = tf.add_n([
@@ -235,6 +234,7 @@ def create_dataset(batch_size, num_batches):
         for audio, label_indices, label_values, label_shape in gen.seq_generator(
             SEQ_LENGTH, FRAMERATE, CHUNK
         ):
+            #print("GENWRAP", len(label_indices), len(label_values), label_shape)
             # Convert to sparse tensor immediately with explicit int32 casting
             # (ctc_loss expects int32 for labels)
             sparse_label = tf.SparseTensor(
@@ -242,6 +242,7 @@ def create_dataset(batch_size, num_batches):
                 values=tf.cast(label_values, tf.int32),
                 dense_shape=tf.cast(label_shape, tf.int64)
             )
+            #print("GENWRAP", len(audio), sparse_label.shape)
             yield audio, sparse_label
 
     # Create dataset from generator
@@ -287,7 +288,7 @@ def main():
     print("\nModel architecture:")
     model.summary()
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
     # Create trainer
     trainer = CTCTrainer(model, optimizer, CHECKPOINT_DIR, LOG_DIR)
