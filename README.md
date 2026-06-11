@@ -7,7 +7,21 @@ to investigate the possibility of using recurrent neural networks and
 connectionist temporal classification (CTC) for decoding morse code 
 messages from raw audio data.
 
-Currently two of the Python scripts are useful:
+## Setup
+
+prepare the Python virtual environment:
+
+    $ ./venv.sh
+
+and activate it:
+
+    $ . .venv/bin/activate
+
+or just source venv.sh:
+
+    $ . venv.sh
+
+Currently three of the Python scripts are useful:
 
 ## generate_wav_samples.py
 
