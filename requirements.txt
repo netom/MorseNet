@@ -1,0 +1,5 @@
+numpy==2.4.6
+scipy==1.17.1
+setuptools==81.0.0
+tensorboard==2.20.0
+tensorflow==2.21.0
