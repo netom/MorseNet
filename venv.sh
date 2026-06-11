@@ -11,10 +11,8 @@ if command -v python > /dev/null; then
 fi
 
 if [ -n "$PYTHON" ]; then
-    python -m venv .venv
-
+    $PYTHON -m venv .venv
     . .venv/bin/activate
-
     pip install -r requirements.txt
 else
     echo "Couldn't run python3 nor python."
