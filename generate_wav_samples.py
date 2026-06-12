@@ -193,7 +193,7 @@ def seq_generator(seq_length, framerate, chunk):
         p.join()
     processes = []
 
-    q = Queue(20)
+    q = Queue(BATCH_SIZE * NUM_BATCHES_PER_EPOCH * 2)
 
     def dowork():
         while True:
@@ -212,7 +212,7 @@ def seq_generator(seq_length, framerate, chunk):
 
             q.put((audio, label_indices, label_values, [len(labels)]))
 
-    for i in range(10):
+    for i in range(SAMPLE_GENERATOR_WORKERS):
         p = Process(target=dowork)
         p.daemon=True
         processes.append(p)
