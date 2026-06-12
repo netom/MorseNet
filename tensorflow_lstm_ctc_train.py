@@ -23,11 +23,12 @@ from model import create_cw_model, ctc_decode
 # Training configuration
 BATCH_SIZE = 100
 NUM_BATCHES_PER_EPOCH = 60
-MAX_EPOCHS = 1000
+MAX_EPOCHS = 10000
 CHECKPOINT_DIR = './model_train'
 LOG_DIR = f'./logs/{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 L2_LAMBDA = 0.005
 GRADIENT_CLIP_NORM = 1.0
+CHECKPOINTS_TO_KEEP = 1000
 
 class CTCTrainer:
     """Custom training class for CTC model with checkpoint management."""
@@ -55,7 +56,7 @@ class CTCTrainer:
         self.checkpoint_manager = tf.train.CheckpointManager(
             self.checkpoint,
             directory=str(self.checkpoint_dir),
-            max_to_keep=30
+            max_to_keep=CHECKPOINTS_TO_KEEP
         )
 
         # TensorBoard writer
