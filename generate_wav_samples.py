@@ -197,7 +197,20 @@ def seq_generator(seq_length, framerate, chunk):
 
     def dowork():
         while True:
-            q.put(generate_seq(seq_length, framerate))
+            audio, labels = generate_seq(seq_length, framerate)
+
+            audio = np.reshape(audio,  (seq_length // chunk, chunk))
+            audio = (audio - np.mean(audio)) / np.std(audio) # Normalization
+
+            labels = np.asarray([MORSE_CHR.index(l[0]) for l in labels])
+
+            label_indices = []
+            label_values = []
+            for i, value in enumerate(labels):
+                label_indices.append([i])
+                label_values.append(value)
+
+            q.put((audio, label_indices, label_values, [len(labels)]))
 
     for i in range(10):
         p = Process(target=dowork)
@@ -206,20 +219,7 @@ def seq_generator(seq_length, framerate, chunk):
         p.start()
 
     while True:
-        audio, labels = q.get()
-
-        audio = np.reshape(audio,  (seq_length // chunk, chunk))
-        audio = (audio - np.mean(audio)) / np.std(audio) # Normalization
-
-        labels = np.asarray([MORSE_CHR.index(l[0]) for l in labels])
-
-        label_indices = []
-        label_values = []
-        for i, value in enumerate(labels):
-            label_indices.append([i])
-            label_values.append(value)
-
-        yield (audio, label_indices, label_values, [len(labels)])
+        yield q.get()
 
 if __name__ == "__main__":
     import os
