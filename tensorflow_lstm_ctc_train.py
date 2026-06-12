@@ -13,22 +13,11 @@ from __future__ import generator_stop
 import tensorflow as tf
 import numpy as np
 import time
-from datetime import datetime
 from pathlib import Path
 
 from config import *
 import generate_wav_samples as gen
 from model import create_cw_model, ctc_decode
-
-# Training configuration
-BATCH_SIZE = 100
-NUM_BATCHES_PER_EPOCH = 60
-MAX_EPOCHS = 10000
-CHECKPOINT_DIR = './model_train'
-LOG_DIR = f'./logs/{datetime.now().strftime("%Y%m%d-%H%M%S")}'
-L2_LAMBDA = 0.005
-GRADIENT_CLIP_NORM = 1.0
-CHECKPOINTS_TO_KEEP = 1000
 
 class CTCTrainer:
     """Custom training class for CTC model with checkpoint management."""

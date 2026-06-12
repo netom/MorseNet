@@ -83,3 +83,18 @@ CHARS = {
     '+': '.-.-.',
     ' ': None
 }
+
+# Training data generations
+
+SAMPLE_GENERATOR_WORKERS=10
+
+# Training configuration
+
+BATCH_SIZE = 100
+NUM_BATCHES_PER_EPOCH = 60
+MAX_EPOCHS = 10000
+CHECKPOINT_DIR = './model_train'
+LOG_DIR = './logs'
+L2_LAMBDA = 0.005
+GRADIENT_CLIP_NORM = 1.0
+CHECKPOINTS_TO_KEEP = 1000
