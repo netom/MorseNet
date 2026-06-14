@@ -193,7 +193,7 @@ def seq_generator(seq_length, framerate, chunk):
         p.join()
     processes = []
 
-    q = Queue(BATCH_SIZE * NUM_BATCHES_PER_EPOCH * 2)
+    q = Queue(BATCH_SIZE * 2)
 
     def dowork():
         while True:
