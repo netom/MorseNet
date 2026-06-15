@@ -9,19 +9,19 @@ messages from raw audio data.
 
 ## Setup
 
-prepare the Python virtual environment:
-
-    $ ./venv.sh
-
-and activate it:
-
-    $ . .venv/bin/activate
-
-or just source venv.sh:
+prepare the Python virtual environment and activate it:
 
     $ . venv.sh
 
-Currently three of the Python scripts are useful:
+this form will not install CUDA libraries, and explicitly disable GPU devices.
+
+To install CUDA libraries and enable the use of GPUs, source venv.sh WITH_CUDA
+set to a non-empty string:
+
+    $ WITH_CUDA=y . venv.sh
+
+venv.sh also sets up LD_LIBRARY_PATH. Running the "deactivate" command will
+restore LD_LIBRARY_PATH.
 
 ## generate_wav_samples.py
 
