@@ -7,9 +7,9 @@ def create_cw_model(
     max_timesteps=TIMESTEPS,
     num_features=CHUNK,
     num_classes=NUM_CLASSES,
-    input_layer_depth=0,
+    input_layer_depth=1,
     input_layer_width=CHUNK,
-    recurrent_layer_depth=2,
+    recurrent_layer_depth=1,
     recurrent_layer_width=128,
     output_layer_depth=1,
     output_layer_width=128
