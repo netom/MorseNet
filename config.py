@@ -86,7 +86,11 @@ CHARS = {
 
 # Training data generations
 
-SAMPLE_GENERATOR_WORKERS=10
+SAMPLE_GENERATOR_WORKER_TYPE='process' # or 'thread'
+
+# Float: CPU core count multiplied by this number
+# Int: number of cores
+SAMPLE_GENERATOR_WORKERS = 0.5
 
 # Training configuration
 

@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
 
+import multiprocessing
 import numpy as np
+import queue
 import random
 import scipy.signal as sig
-
-from multiprocessing import Process, Queue
+import tensorflow as tf
+import threading
 
 from config import *
+
+if SAMPLE_GENERATOR_WORKER_TYPE == 'process':
+    Worker = multiprocessing.Process
+    Queue  = multiprocessing.Queue 
+elif SAMPLE_GENERATOR_WORKER_TYPE == 'thread':
+    Worker = threading.Thread
+    Queue  = queue.Queue
+else:
+    raise Exception(f"")
 
 # Spectral inversion for FIR filters
 def spectinvert(taps):
@@ -180,75 +191,91 @@ def generate_seq(seq_length, framerate=FRAMERATE):
 
     return s, characters
 
-# List of worker processes
-processes = []
+# List of worker processes or threads
+workers = []
 
-# A generator yielding an audio array, and indices and lables for
-# building a sparsetensor describing labels for CTC functions
-def seq_generator(seq_length, framerate, chunk):
-    global processes
+work_queue = Queue(BATCH_SIZE * 2)
 
-    for p in processes:
-        p.terminate()
-        p.join()
-    processes = []
-
-    q = Queue(BATCH_SIZE * 2)
-
-    def dowork():
-        while True:
-            audio, labels = generate_seq(seq_length, framerate)
-
-            audio = np.reshape(audio,  (seq_length // chunk, chunk))
-            audio = (audio - np.mean(audio)) / np.std(audio) # Normalization
-
-            labels = np.asarray([MORSE_CHR.index(l[0]) for l in labels])
-
-            label_indices = []
-            label_values = []
-            for i, value in enumerate(labels):
-                label_indices.append([i])
-                label_values.append(value)
-
-            q.put((audio, label_indices, label_values, [len(labels)]))
-
-    for i in range(SAMPLE_GENERATOR_WORKERS):
-        p = Process(target=dowork)
-        p.daemon=True
-        processes.append(p)
-        p.start()
+def dowork():
+    global work_queue
 
     while True:
-        yield q.get()
+        audio, labels = generate_seq(SEQ_LENGTH, FRAMERATE)
+
+        audio = np.reshape(audio,  (SEQ_LENGTH // CHUNK, CHUNK))
+        audio = (audio - np.mean(audio)) / np.std(audio) # Normalization
+
+        labels = np.asarray([MORSE_CHR.index(l[0]) for l in labels])
+
+        label_indices = []
+        label_values = []
+        for i, value in enumerate(labels):
+            label_indices.append([i])
+            label_values.append(value)
+        label_shape = [len(labels)]
+
+        sparse_label = tf.SparseTensor(
+            indices=tf.cast(label_indices, tf.int64),
+            values=tf.cast(label_values, tf.int32),
+            dense_shape=tf.cast(label_shape, tf.int64)
+        )
+
+        work_queue.put((audio, sparse_label))
+
+def start_workers():
+    global workers
+
+    if len(workers) > 0:
+        return
+
+    num_workers = SAMPLE_GENERATOR_WORKERS
+
+    if num_workers < 0:
+        raise Exception(f'Number of workers must be greater than 0, got {num_workers}')
+
+    if type(num_workers) == float:
+        num_workers = round(multiprocessing.cpu_count() * num_workers)
+
+    for i in range(num_workers):
+        w = Worker(target=dowork)
+        w.daemon=True
+        workers.append(w)
+        w.start()
+
+# A generator yielding an audio array, and a sparse tensor of lablels for CTC
+# functions
+def seq_generator():
+    start_workers()
+    while True:
+        yield work_queue.get()
+
+def save_files(dirname, seq_length, batch_size):
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+    for i in range(batch_size):
+        w = 20
+        n = w*i//batch_size
+        sys.stdout.write("\r[%s>%s] %4d/%4d  " % ("="*n, " "*(w-n), i, batch_size))
+        sys.stdout.flush()
+        filename = dirname + '/%03d.wav' % i
+
+        audio, characters = generate_seq(seq_length)
+
+        scipy.io.wavfile.write(filename, FRAMERATE, audio)
+
+        with open(dirname + '/%03d.txt' % i, 'w') as f:
+            f.write('\n'.join(map(lambda x: x[0] + ',' + str(x[1]), characters)))
+
+        with open(dirname + '/config.txt', 'w') as f:
+            f.write('%d' % seq_length)
+    print("")
 
 if __name__ == "__main__":
     import os
     import sys
     import argparse
     import scipy.io.wavfile
-
-    def save_files(dirname, seq_length, batch_size):
-
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-
-        for i in range(batch_size):
-            w = 20
-            n = w*i//batch_size
-            sys.stdout.write("\r[%s>%s] %4d/%4d  " % ("="*n, " "*(w-n), i, batch_size))
-            sys.stdout.flush()
-            filename = dirname + '/%03d.wav' % i
-
-            audio, characters = generate_seq(seq_length)
-
-            scipy.io.wavfile.write(filename, FRAMERATE, audio)
-
-            with open(dirname + '/%03d.txt' % i, 'w') as f:
-                f.write('\n'.join(map(lambda x: x[0] + ',' + str(x[1]), characters)))
-
-            with open(dirname + '/config.txt', 'w') as f:
-                f.write('%d' % seq_length)
-        print("")
 
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument(
@@ -267,3 +294,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     save_files(args.dirname, args.length * FRAMERATE, args.batchsize)
+

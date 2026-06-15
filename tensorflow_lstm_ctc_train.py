@@ -219,25 +219,8 @@ def create_dataset(batch_size, num_batches):
         tf.data.Dataset
     """
 
-    def generator_wrapper():
-        """Wrapper for generator to match output signature."""
-        for audio, label_indices, label_values, label_shape in gen.seq_generator(
-            SEQ_LENGTH, FRAMERATE, CHUNK
-        ):
-            #print("GENWRAP", len(label_indices), len(label_values), label_shape)
-            # Convert to sparse tensor immediately with explicit int32 casting
-            # (ctc_loss expects int32 for labels)
-            sparse_label = tf.SparseTensor(
-                indices=tf.cast(label_indices, tf.int64),
-                values=tf.cast(label_values, tf.int32),
-                dense_shape=tf.cast(label_shape, tf.int64)
-            )
-            #print("GENWRAP", len(audio), sparse_label.shape)
-            yield audio, sparse_label
-
-    # Create dataset from generator
     dataset = tf.data.Dataset.from_generator(
-        generator_wrapper,
+        gen.seq_generator,
         output_signature=(
             tf.TensorSpec(shape=(TIMESTEPS, CHUNK), dtype=tf.float32),
             tf.SparseTensorSpec(shape=(None,), dtype=tf.int32)
@@ -251,7 +234,7 @@ def create_dataset(batch_size, num_batches):
     dataset = dataset.take(num_batches)
 
     # Prefetch for performance
-    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+    dataset = dataset.prefetch(True)
 
     return dataset
 
@@ -259,9 +242,9 @@ def create_dataset(batch_size, num_batches):
 def main():
     """Main training loop."""
 
-    print("="*70)
+    print("")
     print("Morse Code Decoder Training - TensorFlow 2.x")
-    print("="*70)
+    print("")
     print(f"TensorFlow version: {tf.__version__}")
     print(f"GPU available: {len(tf.config.list_physical_devices('GPU')) > 0}")
     print(f"Batch size: {BATCH_SIZE}")
@@ -269,33 +252,23 @@ def main():
     print(f"Max epochs: {MAX_EPOCHS}")
     print(f"Checkpoint dir: {CHECKPOINT_DIR}")
     print(f"Log dir: {LOG_DIR}")
-    print("="*70)
+    print("")
 
-    # Create model
-    print("\nCreating model...")
     model = create_cw_model()
-
-    print("\nModel architecture:")
-    model.summary()
-
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
-
-    # Create trainer
     trainer = CTCTrainer(model, optimizer, CHECKPOINT_DIR, LOG_DIR)
 
     print(f"\nStarting training...")
     print(f"TensorBoard: tensorboard --logdir={LOG_DIR}")
-    print("="*70)
+    print("")
 
     # Training loop
+    train_dataset = create_dataset(BATCH_SIZE, NUM_BATCHES_PER_EPOCH)
     try:
         for epoch in range(MAX_EPOCHS):
-            print(f"\n{'='*70}")
+            print("")
             print(f"Epoch {epoch + 1}/{MAX_EPOCHS}")
-            print(f"{'='*70}")
-
-            # Create dataset for this epoch
-            train_dataset = create_dataset(BATCH_SIZE, NUM_BATCHES_PER_EPOCH)
+            print("")
 
             # Train
             metrics = trainer.train_epoch(train_dataset, epoch)
@@ -304,14 +277,14 @@ def main():
             trainer.log_metrics(metrics, epoch)
 
             # Print epoch summary
-            print(f"\n{'='*70}")
+            print("")
             print(f"Epoch {epoch + 1} Summary:")
             print(f"  Loss:     {metrics['loss']:.4f}")
             print(f"  CTC Loss: {metrics['ctc_loss']:.4f}")
             print(f"  L2 Loss:  {metrics['l2_loss']:.4f}")
             print(f"  LER:      {metrics['ler']:.4f}")
             print(f"  Time:     {metrics['time']:.2f}s")
-            print(f"{'='*70}")
+            print(f"")
 
             # Save checkpoint every 5 epochs
             if (epoch + 1) % 5 == 0:
