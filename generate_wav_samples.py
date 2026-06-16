@@ -9,6 +9,7 @@ import tensorflow as tf
 import threading
 
 from config import *
+from numba import njit
 
 if SAMPLE_GENERATOR_WORKER_TYPE == 'process':
     Worker = multiprocessing.Process
@@ -20,9 +21,11 @@ else:
     raise Exception(f"")
 
 # Spectral inversion for FIR filters
+@njit
 def spectinvert(taps):
-    l = len(taps)
-    return ([0]*(l//2) + [1] + [0]*(l//2)) - taps
+    new_taps = -taps
+    new_taps[len(taps) // 2 + 1] += 1.0
+    return new_taps
 
 # Returns the dit length in secods from the WPM
 def wpm2dit(wpm):
