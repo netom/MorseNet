@@ -278,7 +278,7 @@ def seq_generator():
         sparse_label = tf.SparseTensor(
             indices=indices,
             values=values,
-            dense_shape=np.asarray((40,), dtype=np.int64) #dense_shape
+            dense_shape=dense_shape # Or a fixed max-length?
         )
         yield audio, sparse_label
 
