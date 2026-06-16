@@ -89,7 +89,7 @@ def process_audio_before_filter(audio, sigvol, seq_length, phase, sigf, framerat
         audio,
         np.arange(80.0, 0.0, -1.0, dtype=np.float32) / 3240.0,
         mode='same'
-    )
+    ).astype(np.float32)
     # Adjust volume
     s *= sigvol
     # Sinewave with phase shift (cw signal)
@@ -104,7 +104,7 @@ def process_audio_before_filter(audio, sigvol, seq_length, phase, sigf, framerat
     return s
 
 @njit
-def process_audio_after_filter(audio):
+def process_audio_after_filter(audio, normalize=False):
     s = audio
     # AGC with fast attack and slow exponential decay
     #a = 0.02  # Attack. The closer to 0 the slower.
@@ -122,7 +122,11 @@ def process_audio_after_filter(audio):
     #s *= 1.56
 
     s /= np.sqrt(np.average(s**2))
-    s = (s * 2**12).astype(np.int16)
+
+    if normalize:
+        s = (s - np.float32(np.mean(s))) / np.float32(np.std(s))
+
+    s = (s * np.float32(2**12)).astype(np.int16)
 
     return s
 
@@ -150,27 +154,27 @@ def morse_marks(c, wpm, deviation):
     
     return (marks, length)
 
-def generate_seq(seq_length, framerate=FRAMERATE):
+def generate_seq(seq_length, framerate=FRAMERATE, normalize=False):
     # Words per minute
     wpm       = random.uniform(WPM_MIN,  WPM_MAX)
     # Error in timing
-    deviation = random.uniform(0.0,  0.2)
+    deviation = np.float32(random.uniform(0.0,  0.2))
     # White noise volume
-    wnvol     = random.uniform(0.3,  4.0)
+    wnvol     = np.float32(random.uniform(0.3,  4.0))
     # QSB volume: 0=no qsb, 1: full silencing QSB
-    qsbvol    = random.uniform(0.0,  0.7)
+    qsbvol    = np.float32(random.uniform(0.0,  0.7))
     # QSB frequency in Hertz
-    qsbf      = random.uniform(0.1,  0.7)
+    qsbf      = np.float32(random.uniform(0.1,  0.7))
     # Signal volume
-    sigvol    = random.uniform(1.0,  4.0)
+    sigvol    = np.float32(random.uniform(1.0,  4.0))
     # Signal frequency
-    sigf      = random.uniform(500.0, 700.0)
+    sigf      = np.float32(random.uniform(500.0, 700.0))
     # Signal phase
-    phase     = random.uniform(0.0,  framerate / sigf)
+    phase     = np.float32(random.uniform(0.0,  framerate / sigf))
     # Filter lower cutoff
-    f1        = random.uniform(sigf - 400, sigf - 100)
+    f1        = np.float32(random.uniform(sigf - np.float32(400.0), sigf - np.float32(100.0)))
     # Filter higher cutoff
-    f2        = random.uniform(sigf + 100, sigf + 400)
+    f2        = np.float32(random.uniform(sigf + np.float32(400.0), sigf + np.float32(100.0)))
     # Number of taps in the filter
     taps      = 63 # The number of taps of the FIR filter
 
@@ -218,8 +222,8 @@ def generate_seq(seq_length, framerate=FRAMERATE):
     fil_bandpass = spectinvert(fil_bandreject)
 
     s = process_audio_before_filter(audio, sigvol, seq_length, phase, sigf, framerate, qsbvol, qsbf, wnvol)
-    s = sig.lfilter(fil_bandpass, 1.0, s)
-    s = process_audio_after_filter(s)
+    s = sig.lfilter(fil_bandpass, np.float32(1.0), s)
+    s = process_audio_after_filter(s, normalize=normalize)
 
     return s, ''.join(characters)
 
@@ -232,7 +236,7 @@ def dowork():
     global work_queue
 
     while True:
-        audio, characters = generate_seq(SEQ_LENGTH_FRAMES, FRAMERATE)
+        audio, characters = generate_seq(SEQ_LENGTH_FRAMES, FRAMERATE, normalize=True)
 
         audio = audio.astype(np.float32)
         audio = np.reshape(audio,  (SEQ_LENGTH_FRAMES // CHUNK, CHUNK))
@@ -274,7 +278,7 @@ def seq_generator():
         sparse_label = tf.SparseTensor(
             indices=indices,
             values=values,
-            dense_shape=dense_shape
+            dense_shape=np.asarray((40,), dtype=np.int64) #dense_shape
         )
         yield audio, sparse_label
 
@@ -289,7 +293,7 @@ def save_files(dirname, seq_length, batch_size):
         sys.stdout.flush()
         filename = dirname + '/%03d.wav' % i
 
-        audio, characters = generate_seq(seq_length)
+        audio, characters = generate_seq(seq_length, FRAMERATE, normalize=True)
 
         # scale and convert to int
         audio = (audio * 2**12).astype(np.int16)
