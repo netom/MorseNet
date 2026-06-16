@@ -28,31 +28,38 @@ def spectinvert(taps):
     return new_taps
 
 # Returns the dit length in secods from the WPM
+@njit
 def wpm2dit(wpm):
     return 1.2 / wpm
 
 # The length of a dit. Deviation is in percent of dit length
+@njit
 def dit_len(wpm, deviation):
     dl = wpm2dit(wpm)
     return int(random.normalvariate(dl, dl * deviation) * FRAMERATE)
 
 # The length of a dah
+@njit
 def dah_len(wpm, deviation, dahw = 3.0):
     return int(dahw * dit_len(wpm, deviation))
 
 # The length of pause between dits and dahs inside a character
+@njit
 def symspace_len(wpm, deviation, symw = 1.0):
     return int(symw * dit_len(wpm, deviation))
 
 # The length of pause between characters inside a word
+@njit
 def chrspace_len(wpm, deviation, chrw = 3.0):
     return int(chrw * dit_len(wpm, deviation))
 
 # The length of a space between two words
+@njit
 def wordspace_len(wpm, deviation, wsw = 6.0):
     return int(wsw * dit_len(wpm, deviation))
 
 # Generates <frames> length of white noise 
+@njit
 def whitenoise(frames, vol):
     return np.random.normal(0, vol, frames)
 
@@ -66,6 +73,7 @@ def impulsenoise(frames, th):
     return ret
 
 # Generates a sequence that when multiplied with the signal, it will cause fading
+@njit
 def qsb(frames, vol, f):
     return 1.0 - np.sin(np.linspace(0, 2 * np.pi * frames / FRAMERATE * f, frames)) * vol
 
