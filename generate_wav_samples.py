@@ -13,7 +13,7 @@ from numba import njit
 
 if SAMPLE_GENERATOR_WORKER_TYPE == 'process':
     Worker = multiprocessing.Process
-    Queue  = multiprocessing.Queue 
+    Queue  = multiprocessing.Queue
 elif SAMPLE_GENERATOR_WORKER_TYPE == 'thread':
     Worker = threading.Thread
     Queue  = queue.Queue
@@ -82,6 +82,50 @@ def impulsenoise(frames, th):
 def qsb(frames, vol, f):
     return 1.0 - np.sin(np.linspace(0, 2 * np.pi * frames / FRAMERATE * f, frames)) * vol
 
+@njit
+def process_audio_before_filter(audio, sigvol, seq_length, phase, sigf, framerate, qsbvol, qsbf, wnvol):
+    # Remove clicks
+    s = np.convolve(
+        audio,
+        np.arange(80.0, 0.0, -1.0, dtype=np.float32) / 3240.0,
+        mode='same'
+    )
+    # Adjust volume
+    s *= sigvol
+    # Sinewave with phase shift (cw signal)
+    s *= np.sin((np.arange(0, seq_length) + phase) * sigf * 2 * np.pi / framerate)
+    # QSB
+    s *= qsb(seq_length, qsbvol, qsbf)
+    # Add white noise
+    s += whitenoise(seq_length, wnvol)
+    # Add impulse noise
+    s += impulsenoise(seq_length, 4.2)
+
+    return s
+
+@njit
+def process_audio_after_filter(audio):
+    s = audio
+    # AGC with fast attack and slow exponential decay
+    #a = 0.02  # Attack. The closer to 0 the slower.
+    #d = 0.002 # Decay. The closer to 0 the slower.
+    #agc_coeff = 1.0   # Correction factor 
+    #for k in range(len(s)):
+    #    s[k] *= agc_coeff
+    #    err = s[k]**2 - 1.0
+    #    if err >= 0:
+    #        # Level is too high
+    #        agc_coeff -= abs(err * a)
+    #    else:
+    #        # Level is too low
+    #        agc_coeff += abs(err * d)
+    #s *= 1.56
+
+    s /= np.sqrt(np.average(s**2))
+    s = (s * 2**12).astype(np.int16)
+
+    return s
+
 # Returns a random morse character
 def get_next_character():
     return random.choice(MORSE_CHR[1:] + [' '] * 5)
@@ -130,7 +174,7 @@ def generate_seq(seq_length, framerate=FRAMERATE):
     # Number of taps in the filter
     taps      = 63 # The number of taps of the FIR filter
 
-    audio = np.zeros(seq_length, dtype=np.float64)
+    audio = np.zeros(seq_length, dtype=np.float32)
     characters = []
 
     padl = int(max(0, random.normalvariate(1, 0.5)) * framerate) # Padding at the beginning
@@ -168,49 +212,14 @@ def generate_seq(seq_length, framerate=FRAMERATE):
         characters.pop()
 
     # Set up the bandpass filter
-    fil_lowpass = sig.firwin(taps, f1/(framerate/2))
-    fil_highpass = spectinvert(sig.firwin(taps, f2/(framerate/2)))
-    fil_bandreject = fil_lowpass+fil_highpass
+    fil_lowpass = np.asarray(sig.firwin(taps, f1/(framerate/2)), dtype=np.float32)
+    fil_highpass = spectinvert(np.asarray(sig.firwin(taps, f2/(framerate/2)), dtype=np.float32))
+    fil_bandreject = fil_lowpass + fil_highpass
     fil_bandpass = spectinvert(fil_bandreject)
 
-    # Remove clicks
-    s = sig.convolve(audio, np.array(range(80, 0, -1)) / 3240.0, mode='same') * sigvol
-    # Sinewave with phase shift (cw signal)
-    s *= np.sin((np.arange(0, seq_length) + phase) * sigf * 2 * np.pi / framerate)
-    # QSB
-    s *= qsb(seq_length, qsbvol, qsbf)
-    # Add white noise
-    s += whitenoise(seq_length, wnvol)
-    # Add impulse noise
-    s += impulsenoise(seq_length, 4.2)
-    # Filter signal
+    s = process_audio_before_filter(audio, sigvol, seq_length, phase, sigf, framerate, qsbvol, qsbf, wnvol)
     s = sig.lfilter(fil_bandpass, 1.0, s)
-    # AGC with fast attack and slow exponential decay
-    #a = 0.02  # Attack. The closer to 0 the slower.
-    #d = 0.002 # Decay. The closer to 0 the slower.
-    #agc_coeff = 1.0   # Correction factor 
-    #for k in range(len(s)):
-    #    s[k] *= agc_coeff
-    #    err = s[k]**2 - 1.0
-    #    if err >= 0:
-    #        # Level is too high
-    #        agc_coeff -= abs(err * a)
-    #    else:
-    #        # Level is too low
-    #        agc_coeff += abs(err * d)
-    #s *= 1.56
-
-    # Normalize data
-    s = (s - np.mean(s)) / np.std(s)
-
-    #print(np.average(s), np.average(s**2), max(s), min(s)) # Debug mean, variance, max, min
-    #exit()
-
-    # TODO: QRN
-    # TODO: QRM
-
-    # Scale and convert to int
-    #s = (s * 2**12).astype(np.int16)
+    s = process_audio_after_filter(s)
 
     return s, ''.join(characters)
 
