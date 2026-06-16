@@ -71,24 +71,24 @@ def get_next_character():
     return random.choice(MORSE_CHR[:-1] + [' '] * 5)
 
 # Returns: ([(1/0, duration), ...], total length)
-def get_onoff_data(c, wpm, deviation):
-    pairs = []
+def morse_marks(c, wpm, deviation):
+    marks = []
     length = 0
     if c == ' ':
-        pairs.append((0.0, wordspace_len(wpm, deviation)))
-        length += pairs[-1][1]
+        marks.append((0.0, wordspace_len(wpm, deviation)))
+        length += marks[-1][1]
     else:
         last_symspace_len = 0
         for sym in CHARS[c]:
-            pairs.append((1.0, dit_len(wpm, deviation) if sym == '.' else dah_len(wpm, deviation)))
-            length += pairs[-1][1]
-            pairs.append((0.0, symspace_len(wpm, deviation)))
-            length += pairs[-1][1]
-        length -= pairs[-1][1]
-        pairs[-1] = (0.0, (chrspace_len(wpm, deviation)))
-        length += pairs[-1][1]
+            marks.append((1.0, dit_len(wpm, deviation) if sym == '.' else dah_len(wpm, deviation)))
+            length += marks[-1][1]
+            marks.append((0.0, symspace_len(wpm, deviation)))
+            length += marks[-1][1]
+        length -= marks[-1][1]
+        marks[-1] = (0.0, (chrspace_len(wpm, deviation)))
+        length += marks[-1][1]
     
-    return (pairs, length)
+    return (marks, length)
 
 def generate_seq(seq_length, framerate=FRAMERATE):
     # Words per minute
@@ -119,7 +119,7 @@ def generate_seq(seq_length, framerate=FRAMERATE):
 
     padl = int(max(0, random.normalvariate(1, 0.5)) * framerate) # Padding at the beginning
     i = padl # The actual index in the samlpes
-    s_pairs, s_length = get_onoff_data(' ', wpm, deviation)
+    s_pairs, s_length = morse_marks(' ', wpm, deviation)
     c = ' '
     while True:
         prev_c = c
@@ -130,8 +130,7 @@ def generate_seq(seq_length, framerate=FRAMERATE):
             c = get_next_character()
 
         # Get the audio samples for this character
-        # TODO: for fuck's sake rename this
-        pairs, length = get_onoff_data(c, wpm, deviation)
+        pairs, length = morse_marks(c, wpm, deviation)
 
         # Check if it's too long to fit
         # Leave some space on the right
