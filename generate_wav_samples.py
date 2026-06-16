@@ -200,27 +200,18 @@ def dowork():
     global work_queue
 
     while True:
-        audio, labels = generate_seq(SEQ_LENGTH, FRAMERATE)
+        audio, characters = generate_seq(SEQ_LENGTH, FRAMERATE)
 
         audio = np.reshape(audio,  (SEQ_LENGTH // CHUNK, CHUNK))
         audio = (audio - np.mean(audio)) / np.std(audio) # Normalization
 
-        labels = np.asarray([MORSE_CHR.index(l[0]) for l in labels])
+        indices = np.asarray(range(len(characters)), dtype=np.int64)
+        indices = np.reshape(indices, (len(indices),1))
 
-        label_indices = []
-        label_values = []
-        for i, value in enumerate(labels):
-            label_indices.append([i])
-            label_values.append(value)
-        label_shape = [len(labels)]
+        values = np.asarray([MORSE_CHR.index(c[0]) for c in characters], dtype=np.int32)
+        dense_shape = np.asarray([len(characters)], dtype=np.int64)
 
-        sparse_label = tf.SparseTensor(
-            indices=tf.cast(label_indices, tf.int64),
-            values=tf.cast(label_values, tf.int32),
-            dense_shape=tf.cast(label_shape, tf.int64)
-        )
-
-        work_queue.put((audio, sparse_label))
+        work_queue.put((audio, indices, values, dense_shape))
 
 def start_workers():
     global workers
@@ -247,7 +238,13 @@ def start_workers():
 def seq_generator():
     start_workers()
     while True:
-        yield work_queue.get()
+        audio, indices, values, dense_shape = work_queue.get()
+        sparse_label = tf.SparseTensor(
+            indices=indices,
+            values=values,
+            dense_shape=dense_shape
+        )
+        yield audio, sparse_label
 
 def save_files(dirname, seq_length, batch_size):
     if not os.path.exists(dirname):
