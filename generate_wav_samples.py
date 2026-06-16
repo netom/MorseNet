@@ -64,12 +64,17 @@ def whitenoise(frames, vol):
     return np.random.normal(0, vol, frames)
 
 # Generates <frames> length of popping noise
+@njit
 def impulsenoise(frames, th):
-    r = np.random.normal(0.0, 1.0, frames)
+    r = np.asarray(np.random.normal(0.0, 1.0, frames), dtype=np.float32)
     r[r < th] = 0.0
     i = r >= th
     r[r >= th] = 1.0
-    ret = sig.convolve(r, [1.0] * 10 + [-1.0] * 10, mode='same')
+
+    kernel = np.ones((20,), dtype=np.float32)
+    kernel[10:] = -1.0
+
+    ret = np.convolve(r, kernel, mode='same')
     return ret
 
 # Generates a sequence that when multiplied with the signal, it will cause fading
