@@ -140,14 +140,14 @@ def generate_seq(seq_length, framerate=FRAMERATE):
             for p in s_pairs:
                 audio[i:i+p[1]] = p[0]
                 i += p[1]
-            characters.append((' ', i / float(framerate)))
+            characters.append(' ')
             break
 
         # Write it into the audio data array
         for p in pairs:
             audio[i:i+p[1]] = p[0]
             i += p[1]
-        characters.append((c, i / float(framerate)))
+        characters.append(c)
 
     # Set up the bandpass filter
     fil_lowpass = sig.firwin(taps, f1/(framerate/2))
@@ -189,7 +189,7 @@ def generate_seq(seq_length, framerate=FRAMERATE):
     # Scale and convert to int
     s = (s * 2**12).astype(np.int16)
 
-    return s, characters
+    return s, ''.join(characters)
 
 # List of worker processes or threads
 workers = []
@@ -208,7 +208,7 @@ def dowork():
         indices = np.asarray(range(len(characters)), dtype=np.int64)
         indices = np.reshape(indices, (len(indices),1))
 
-        values = np.asarray([MORSE_CHR.index(c[0]) for c in characters], dtype=np.int32)
+        values = np.asarray([MORSE_CHR.index(c) for c in characters], dtype=np.int32)
         dense_shape = np.asarray([len(characters)], dtype=np.int64)
 
         work_queue.put((audio, indices, values, dense_shape))
@@ -262,7 +262,7 @@ def save_files(dirname, seq_length, batch_size):
         scipy.io.wavfile.write(filename, FRAMERATE, audio)
 
         with open(dirname + '/%03d.txt' % i, 'w') as f:
-            f.write('\n'.join(map(lambda x: x[0] + ',' + str(x[1]), characters)))
+            f.write(characters)
 
         with open(dirname + '/config.txt', 'w') as f:
             f.write('%d' % seq_length)
