@@ -212,7 +212,7 @@ def dowork():
         indices = np.asarray(range(len(characters)), dtype=np.int64)
         indices = np.reshape(indices, (len(indices),1))
 
-        values = np.asarray([MORSE_CHR.index(c) for c in characters], dtype=np.int32)
+        values = np.asarray([MORSE_ORD[c] for c in characters], dtype=np.int32)
         dense_shape = np.asarray([len(characters)], dtype=np.int64)
 
         work_queue.put((audio, indices, values, dense_shape))
