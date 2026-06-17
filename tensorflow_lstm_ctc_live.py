@@ -93,13 +93,7 @@ class LiveDecoder:
 
     def _load_model(self, checkpoint_dir):
         """Load model from checkpoint."""
-        model = create_cw_model(
-            max_timesteps=None,  # Variable length
-            num_features=CHUNK,
-            recurrent_layer_depth=3,  # STANDARDIZED to 3 layers
-            recurrent_layer_width=128,
-            num_classes=NUM_CLASSES
-        )
+        model = create_cw_model()
 
         checkpoint_dir = Path(checkpoint_dir)
         if not checkpoint_dir.exists():
