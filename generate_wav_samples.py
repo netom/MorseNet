@@ -181,12 +181,17 @@ def generate_seq(seq_length, framerate=FRAMERATE):
     #        agc_coeff += abs(err * d)
     #s *= 1.56
 
-    s /= np.sqrt(np.average(s**2))
-    #print np.average(s), np.average(s**2), max(s), min(s) # Debug mean, variance, max, min
+    # Normalize data
+    s = (s - np.mean(s)) / np.std(s)
+
+    #print(np.average(s), np.average(s**2), max(s), min(s)) # Debug mean, variance, max, min
     #exit()
+
     # TODO: QRN
+    # TODO: QRM
+
     # Scale and convert to int
-    s = (s * 2**12).astype(np.int16)
+    #s = (s * 2**12).astype(np.int16)
 
     return s, ''.join(characters)
 
@@ -201,8 +206,8 @@ def dowork():
     while True:
         audio, characters = generate_seq(SEQ_LENGTH, FRAMERATE)
 
+        audio = audio.astype(np.float32)
         audio = np.reshape(audio,  (SEQ_LENGTH // CHUNK, CHUNK))
-        audio = (audio - np.mean(audio)) / np.std(audio) # Normalization
 
         indices = np.asarray(range(len(characters)), dtype=np.int64)
         indices = np.reshape(indices, (len(indices),1))
@@ -257,6 +262,9 @@ def save_files(dirname, seq_length, batch_size):
         filename = dirname + '/%03d.wav' % i
 
         audio, characters = generate_seq(seq_length)
+
+        # scale and convert to int
+        audio = (audio * 2**12).astype(np.int16)
 
         scipy.io.wavfile.write(filename, FRAMERATE, audio)
 
