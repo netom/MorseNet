@@ -62,3 +62,24 @@ decodes a wav file given it's name as it's sole argument.
     $ ./tensorflow_lstm_ctc_decode.py test.wav
 
 The decoded text will appear under a pile of TF INFO messages.
+
+## Running with NVidia MPS
+
+See: https://docs.nvidia.com/deploy/mps/latest/index.html
+
+Start the MPS control process. To observe logs real-time, start it in the
+foreground:
+
+    $ nvidia-cuda-mps-control -f
+
+Set up the environment in another terminal:
+
+    $ export CUDA_VISIBLE_DEVICES=0
+    $ export CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=2G
+    $ ./tensorflow_lstm_ctc_train.py
+
+You can safely run inference in an other terminal with less resources:
+
+    $ export CUDA_VISIBLE_DEVICES=0
+    $ export CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=512M
+    $ ./tensorflow_lstm_ctc_train.py
