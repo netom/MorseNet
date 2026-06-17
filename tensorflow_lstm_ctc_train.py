@@ -61,7 +61,7 @@ class CTCTrainer:
         else:
             print("Starting training from scratch")
 
-    @tf.function(reduce_retracing=True)
+    @tf.function
     def train_step(self, audio, labels, input_length, label_length):
         """
         Single training step with automatic differentiation.
@@ -84,7 +84,7 @@ class CTCTrainer:
                 label_length=label_length,
                 logit_length=input_length,
                 logits_time_major=False,
-                blank_index=NUM_CLASSES-1
+                blank_index=0
             ))
 
             # L2 regularization (exclude bias terms)
@@ -109,11 +109,11 @@ class CTCTrainer:
             zip(gradients, self.model.trainable_variables)
         )
 
-        # Decode for LER calculation (use greedy decoder for speed)
+        # Decode for LER calculation with beam_width=1
         decoded, _ = ctc_decode(
             logits,
             sequence_length=input_length,
-            use_beam_search=False
+            beam_width=1
         )
 
         # Calculate Label Error Rate using edit distance

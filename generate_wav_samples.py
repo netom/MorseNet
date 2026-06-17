@@ -68,7 +68,7 @@ def qsb(frames, vol, f):
 
 # Returns a random morse character
 def get_next_character():
-    return random.choice(MORSE_CHR[:-1] + [' '] * 5)
+    return random.choice(MORSE_CHR[1:] + [' '] * 5)
 
 # Returns: ([(1/0, duration), ...], total length)
 def morse_marks(c, wpm, deviation):
@@ -92,7 +92,7 @@ def morse_marks(c, wpm, deviation):
 
 def generate_seq(seq_length, framerate=FRAMERATE):
     # Words per minute
-    wpm       = random.uniform(10,  40.0)
+    wpm       = random.uniform(WPM_MIN,  WPM_MAX)
     # Error in timing
     deviation = random.uniform(0.0,  0.2)
     # White noise volume
@@ -204,16 +204,16 @@ def dowork():
     global work_queue
 
     while True:
-        audio, characters = generate_seq(SEQ_LENGTH, FRAMERATE)
+        audio, characters = generate_seq(SEQ_LENGTH_FRAMES, FRAMERATE)
 
         audio = audio.astype(np.float32)
-        audio = np.reshape(audio,  (SEQ_LENGTH // CHUNK, CHUNK))
+        audio = np.reshape(audio,  (SEQ_LENGTH_FRAMES // CHUNK, CHUNK))
 
         indices = np.asarray(range(len(characters)), dtype=np.int64)
         indices = np.reshape(indices, (len(indices),1))
 
         values = np.asarray([MORSE_ORD[c] for c in characters], dtype=np.int32)
-        dense_shape = np.asarray([len(characters)], dtype=np.int64)
+        dense_shape = np.asarray([SEQ_MAX_CHARS], dtype=np.int64)
 
         work_queue.put((audio, indices, values, dense_shape))
 
@@ -291,7 +291,7 @@ if __name__ == "__main__":
         help='the number of examples to generate'
     )
     parser.add_argument(
-        '--length', metavar='LENGTH', type=int, default=SEQ_LENGTH // FRAMERATE,
+        '--length', metavar='LENGTH', type=int, default=SEQ_LENGTH_SECONDS,
         help='the approximate length of the samples in whole seconds'
     )
 

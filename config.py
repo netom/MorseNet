@@ -11,11 +11,18 @@ FFT_SIZE = 128 # 62.5Hz wide bins
 CHUNK = 256
 
 # The size of a sample in chunks
-SEQ_LENGTH = (FRAMERATE * 12) // CHUNK * CHUNK
-TIMESTEPS = SEQ_LENGTH // CHUNK
+SEQ_LENGTH_SECONDS = 12
+SEQ_LENGTH_FRAMES = (FRAMERATE * SEQ_LENGTH_SECONDS) // CHUNK * CHUNK
+TIMESTEPS = SEQ_LENGTH_FRAMES // CHUNK
+
+# Code speed and max length
+WPM_MIN = 10.0
+WPM_MAX = 40.0
+SEQ_MAX_CHARS=100
 
 # The character set in canonical order
 MORSE_CHR = [
+    '\0',
     ' ',
     'A','B','C','D','E','F','G','H','I','J',
     'K','L','M','N','O','P','Q','R','S','T',
@@ -27,7 +34,6 @@ MORSE_CHR = [
     '/',
     '=',
     '+',
-    '\0'
 ]
 
 NUM_CLASSES = len(MORSE_CHR)
@@ -81,7 +87,7 @@ CHARS = {
     '/': '-..-.',
     '=': '-...-',
     '+': '.-.-.',
-    ' ': None
+    ' ': None,
 }
 
 # Training data generations

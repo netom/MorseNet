@@ -106,8 +106,7 @@ def decode_audio(model, audio, timesteps, use_beam_search=True, beam_width=100):
     decoded, log_prob = ctc_decode(
         logits,
         sequence_length=[timesteps],
-        beam_width=beam_width,
-        use_beam_search=use_beam_search
+        beam_width=beam_width
     )
 
     # Convert to text
