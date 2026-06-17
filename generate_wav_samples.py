@@ -118,35 +118,38 @@ def generate_seq(seq_length, framerate=FRAMERATE):
     characters = []
 
     padl = int(max(0, random.normalvariate(1, 0.5)) * framerate) # Padding at the beginning
-    i = padl # The actual index in the samlpes
-    s_pairs, s_length = morse_marks(' ', wpm, deviation)
-    c = ' '
-    while True:
+    padr = int(max(0, random.normalvariate(1, 0.5)) * framerate) # Padding at the end
+
+    i      = padl # Current audio sample index. Start at padl.
+    prev_c = ' ' # Previous character
+    c      = ' '  # Current character. Hack: prevent starting with space.
+
+    while len(characters) < SEQ_MAX_CHARS:
         prev_c = c
         c = get_next_character()
-        # Generate a character,
-        # but not space at the beginning, or repeating spaces
-        while prev_c == ' ' and c == ' ':
-            c = get_next_character()
+
+        # Avoid runs of spaces. Also prevents starting with a space (see above).
+        if prev_c == ' ':
+            while c == ' ':
+                c = get_next_character()
 
         # Get the audio samples for this character
         pairs, length = morse_marks(c, wpm, deviation)
 
         # Check if it's too long to fit
-        # Leave some space on the right
-        # Always insert a space after the sequence
-        if i + length + s_length + 1000 >= seq_length:
-            for p in s_pairs:
-                audio[i:i+p[1]] = p[0]
-                i += p[1]
-            characters.append(' ')
+        if i + length + padr >= seq_length:
             break
 
         # Write it into the audio data array
         for p in pairs:
             audio[i:i+p[1]] = p[0]
             i += p[1]
+
         characters.append(c)
+
+    # If the last character is a space, just remove it.
+    while characters[-1] == ' ':
+        characters.pop()
 
     # Set up the bandpass filter
     fil_lowpass = sig.firwin(taps, f1/(framerate/2))

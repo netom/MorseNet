@@ -16,9 +16,12 @@ SEQ_LENGTH_FRAMES = (FRAMERATE * SEQ_LENGTH_SECONDS) // CHUNK * CHUNK
 TIMESTEPS = SEQ_LENGTH_FRAMES // CHUNK
 
 # Code speed and max length
+#
+# Sequence max length can be much shorter than the theoretical
+# maximum, as having a fast all-E sequence is very, very unlikely.
 WPM_MIN = 10.0
 WPM_MAX = 40.0
-SEQ_MAX_CHARS=100
+SEQ_MAX_CHARS=50
 
 # The character set in canonical order
 MORSE_CHR = [
