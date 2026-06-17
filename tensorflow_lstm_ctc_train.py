@@ -101,9 +101,6 @@ class CTCTrainer:
         # Compute gradients
         gradients = tape.gradient(total_loss, self.model.trainable_variables)
 
-        # Clip gradients by global norm (use smaller value for stability)
-        gradients, _ = tf.clip_by_global_norm(gradients, 0.5)
-
         # Apply gradients
         self.optimizer.apply_gradients(
             zip(gradients, self.model.trainable_variables)
@@ -234,7 +231,7 @@ def create_dataset(batch_size, num_batches):
     dataset = dataset.take(num_batches)
 
     # Prefetch for performance
-    dataset = dataset.prefetch(True)
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
     return dataset
 
