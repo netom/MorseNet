@@ -9,7 +9,7 @@ def create_cw_model(
     num_classes=NUM_CLASSES,
     input_layer_depth=0,
     input_layer_width=CHUNK,
-    recurrent_layer_depth=2,
+    recurrent_layer_depth=3,
     recurrent_layer_width=128,
     output_layer_depth=1,
     output_layer_width=128
