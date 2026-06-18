@@ -3,35 +3,26 @@
 import tensorflow as tf
 from config import *
 
+# TODO: dropout
 def create_cw_model(
-    max_timesteps=TIMESTEPS,
-    num_features=CHUNK,
-    num_classes=NUM_CLASSES,
-    input_layer_depth=0,
-    input_layer_width=CHUNK,
-    recurrent_layer_depth=3,
-    recurrent_layer_width=128,
-    output_layer_depth=1,
-    output_layer_width=128
+    input_widths=[128],
+    recurrent_widths=[128,128,128],
+    output_widths=[NUM_CLASSES],
 ):
-    # Input dense layers
-    input_dense = []
-    for i in range(input_layer_depth):
-        input_dense.append(tf.keras.layers.Dense(
-            input_layer_width,
+    layers = []
+
+    for i, width in enumerate(input_widths):
+        layers.append(tf.keras.layers.Dense(
+            width,
             kernel_initializer = tf.keras.initializers.Orthogonal(1.0),
             bias_initializer = tf.keras.initializers.Zeros(),
             activation=None,
-            name=f'input_dense_{i}'
+            name=f'input_{i}'
         ))
-        # TODO: dropout
 
-    # Recurrent layers with layer normalization
-    # This replaces tf.contrib.rnn.LayerNormBasicLSTMCell from TF 1.x
-    recurrent = []
-    for i in range(recurrent_layer_depth):
-        recurrent.append(tf.keras.layers.LSTM(
-            recurrent_layer_width,
+    for i, width in enumerate(recurrent_widths):
+        layers.append(tf.keras.layers.LSTM(
+            width,
             return_sequences=True,
             activation='tanh',
             recurrent_activation='sigmoid',
@@ -43,23 +34,17 @@ def create_cw_model(
             name=f'lstm_{i}'
         ))
 
-        recurrent.append(tf.keras.layers.LayerNormalization(
-            name=f'layer_norm_{i}'
-        ))
-
-        # TODO: dropout?
-
-    output_dense = []
-    for i in range(recurrent_layer_depth):
-        output_dense.append(tf.keras.layers.Dense(
-            num_classes,
+    for i, width in enumerate(output_widths):
+        layers.append(tf.keras.layers.Dense(
+            width,
             activation=None,
             kernel_initializer=tf.keras.initializers.Orthogonal(gain=1.0),
             bias_initializer=tf.keras.initializers.Zeros(),
-            name=f'output_dense_{i}'
+            name=f'output_{i}'
         ))
 
-    model = tf.keras.Sequential(input_dense + recurrent + output_dense)
+    model = tf.keras.Sequential(layers)
+    model.run_eagerly=True
 
     return model
 
@@ -67,8 +52,8 @@ def ctc_decode(logits, sequence_length, beam_width=100):
     """
     Decode CTC outputs to character sequences.
 
-    tf.nn.ctc_beam_search_decoder has no blank_index parameter — it always
-    treats index num_classes-1 as blank.  To support blank at index 0
+    tf.nn.ctc_beam_search_decoder has no blank_index parameter - it always
+    treats index num_classes-1 as blank. To support blank at index 0
     (matching tf.nn.ctc_loss blank_index=0), the class axis is rotated before
     decoding (blank moves from front to back) and decoded indices are shifted
     back by +1 afterward.

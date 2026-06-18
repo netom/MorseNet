@@ -252,6 +252,7 @@ def main():
     print("")
 
     model = create_cw_model()
+    model.summary()
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
     trainer = CTCTrainer(model, optimizer, CHECKPOINT_DIR, LOG_DIR)
 
