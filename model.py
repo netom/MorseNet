@@ -5,8 +5,8 @@ from config import *
 
 # TODO: dropout
 def create_cw_model(
-    input_widths=[128],
-    recurrent_widths=[128,128,128],
+    input_widths=[],
+    recurrent_widths=[128],
     output_widths=[NUM_CLASSES],
 ):
     layers = []
@@ -14,8 +14,7 @@ def create_cw_model(
     for i, width in enumerate(input_widths):
         layers.append(tf.keras.layers.Dense(
             width,
-            kernel_initializer = tf.keras.initializers.Orthogonal(1.0),
-            bias_initializer = tf.keras.initializers.Zeros(),
+            kernel_regularizer = tf.keras.regularizers.L2(L2_LAMBDA),
             activation=None,
             name=f'input_{i}'
         ))
@@ -27,19 +26,18 @@ def create_cw_model(
             activation='tanh',
             recurrent_activation='sigmoid',
             use_bias=True,
-            kernel_initializer=tf.keras.initializers.Orthogonal(gain=1.0),
-            recurrent_initializer=tf.keras.initializers.Orthogonal(gain=1.0),
+            kernel_regularizer = tf.keras.regularizers.L2(L2_LAMBDA),
             dropout=0.0,
             recurrent_dropout=0.0,
             name=f'lstm_{i}'
         ))
+        layers.append(tf.keras.layers.LayerNormalization())
 
     for i, width in enumerate(output_widths):
         layers.append(tf.keras.layers.Dense(
             width,
             activation=None,
-            kernel_initializer=tf.keras.initializers.Orthogonal(gain=1.0),
-            bias_initializer=tf.keras.initializers.Zeros(),
+            kernel_regularizer = tf.keras.regularizers.L2(L2_LAMBDA),
             name=f'output_{i}'
         ))
 

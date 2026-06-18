@@ -78,7 +78,7 @@ class CTCTrainer:
         with tf.GradientTape() as tape:
             logits = self.model(audio, training=True)
 
-            ctc_loss = tf.reduce_mean(tf.nn.ctc_loss(
+            loss = tf.reduce_mean(tf.nn.ctc_loss(
                 labels=labels,
                 logits=logits,
                 label_length=label_length,
@@ -87,33 +87,17 @@ class CTCTrainer:
                 blank_index=0
             ))
 
-            # L2 regularization (exclude bias terms)
-            l2_loss = tf.add_n([
-                tf.nn.l2_loss(var)
-                for var in self.model.trainable_variables
-                if 'bias' not in var.name.lower()
-            ])
-            l2_loss *= L2_LAMBDA
-
-            # Total loss
-            total_loss = ctc_loss + l2_loss
-
-        # Compute gradients
-        gradients = tape.gradient(total_loss, self.model.trainable_variables)
-
-        # Apply gradients
+        gradients = tape.gradient(loss, self.model.trainable_variables)
         self.optimizer.apply_gradients(
             zip(gradients, self.model.trainable_variables)
         )
 
-        # Decode for LER calculation with beam_width=1
         decoded, _ = ctc_decode(
             logits,
             sequence_length=input_length,
             beam_width=1
         )
 
-        # Calculate Label Error Rate using edit distance
         ler = tf.reduce_mean(
             tf.edit_distance(
                 tf.cast(decoded[0], tf.int32),
@@ -121,7 +105,7 @@ class CTCTrainer:
             )
         )
 
-        return total_loss, ctc_loss, l2_loss, ler
+        return loss, ler
 
     def train_epoch(self, dataset, epoch):
         """
@@ -135,8 +119,6 @@ class CTCTrainer:
             Dictionary with epoch metrics
         """
         self.train_loss_metric.reset_state()
-        self.train_ctc_loss_metric.reset_state()
-        self.train_l2_loss_metric.reset_state()
         self.train_ler_metric.reset_state()
 
         start_time = time.time()
@@ -156,14 +138,12 @@ class CTCTrainer:
             )
 
             # Train step
-            total_loss, ctc_loss, l2_loss, ler = self.train_step(
+            loss, ler = self.train_step(
                 audio, labels, input_length, label_length
             )
 
             # Update metrics
-            self.train_loss_metric.update_state(total_loss)
-            self.train_ctc_loss_metric.update_state(ctc_loss)
-            self.train_l2_loss_metric.update_state(l2_loss)
+            self.train_loss_metric.update_state(loss)
             self.train_ler_metric.update_state(ler)
 
             # Increment step counter
@@ -173,8 +153,7 @@ class CTCTrainer:
             if batch_idx % 10 == 0:
                 print(
                     f"Epoch {epoch:3d}, Batch {batch_idx:3d}/{NUM_BATCHES_PER_EPOCH}: "
-                    f"Loss={total_loss.numpy():.4f} "
-                    f"(CTC={ctc_loss.numpy():.4f}, L2={l2_loss.numpy():.4f}), "
+                    f"Loss={loss.numpy():.4f} "
                     f"LER={ler.numpy():.4f}"
                 )
 
@@ -182,8 +161,6 @@ class CTCTrainer:
 
         return {
             'loss': self.train_loss_metric.result().numpy(),
-            'ctc_loss': self.train_ctc_loss_metric.result().numpy(),
-            'l2_loss': self.train_l2_loss_metric.result().numpy(),
             'ler': self.train_ler_metric.result().numpy(),
             'time': epoch_time
         }
@@ -198,11 +175,8 @@ class CTCTrainer:
         """Log metrics to TensorBoard."""
         with self.train_writer.as_default():
             tf.summary.scalar('loss', metrics['loss'], step=epoch)
-            tf.summary.scalar('ctc_loss', metrics['ctc_loss'], step=epoch)
-            tf.summary.scalar('l2_loss', metrics['l2_loss'], step=epoch)
             tf.summary.scalar('ler', metrics['ler'], step=epoch)
             tf.summary.scalar('epoch_time', metrics['time'], step=epoch)
-
 
 def create_dataset(batch_size, num_batches):
     """
@@ -278,8 +252,6 @@ def main():
             print("")
             print(f"Epoch {epoch + 1} Summary:")
             print(f"  Loss:     {metrics['loss']:.4f}")
-            print(f"  CTC Loss: {metrics['ctc_loss']:.4f}")
-            print(f"  L2 Loss:  {metrics['l2_loss']:.4f}")
             print(f"  LER:      {metrics['ler']:.4f}")
             print(f"  Time:     {metrics['time']:.2f}s")
             print(f"")
