@@ -10,10 +10,11 @@ for maximum control over the training process.
 
 from __future__ import generator_stop
 
-import tensorflow as tf
 import numpy as np
+import os
+import pathlib
+import tensorflow as tf
 import time
-from pathlib import Path
 
 from config import *
 import generate_wav_samples as gen
@@ -25,9 +26,9 @@ class CTCTrainer:
     def __init__(self, model, optimizer, checkpoint_dir, log_dir):
         self.model = model
         self.optimizer = optimizer
-        self.checkpoint_dir = Path(checkpoint_dir)
+        self.checkpoint_dir = pathlib.Path(checkpoint_dir)
         self.checkpoint_dir.mkdir(exist_ok=True, parents=True)
-        self.log_dir = Path(log_dir)
+        self.log_dir = pathlib.Path(log_dir)
         self.log_dir.mkdir(exist_ok=True, parents=True)
 
         # Metrics
@@ -178,7 +179,7 @@ class CTCTrainer:
             tf.summary.scalar('ler', metrics['ler'], step=epoch)
             tf.summary.scalar('epoch_time', metrics['time'], step=epoch)
 
-def create_dataset(batch_size, num_batches):
+def create_dataset_from_generator(batch_size, num_batches):
     """
     Create tf.data.Dataset from generator.
 
@@ -209,7 +210,6 @@ def create_dataset(batch_size, num_batches):
 
     return dataset
 
-
 def main():
     """Main training loop."""
 
@@ -235,7 +235,7 @@ def main():
     print("")
 
     # Training loop
-    train_dataset = create_dataset(BATCH_SIZE, NUM_BATCHES_PER_EPOCH)
+    train_dataset = create_dataset_from_generator(BATCH_SIZE, NUM_BATCHES_PER_EPOCH)
     try:
         for epoch in range(MAX_EPOCHS):
             print("")
