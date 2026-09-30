@@ -44,7 +44,7 @@ _OLD_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
 
 export LD_LIBRARY_PATH=$(
     (   tr : "\n" <<< "$LD_LIBRARY_PATH"
-        find "$VIRTUAL_ENV" -name "*.so*" | grep nvidia | xargs dirname
+        find "$VIRTUAL_ENV" -name "*.so*" | grep nvidia | xargs -r dirname
     ) | sort -u | grep '[[:graph:]]' | paste -d ":" -s -
 )
 
