@@ -40,7 +40,8 @@ class CTCTrainer:
         self.checkpoint = tf.train.Checkpoint(
             optimizer=self.optimizer,
             model=self.model,
-            step=tf.Variable(0, dtype=tf.int64)
+            step=tf.Variable(0, dtype=tf.int64),
+            epoch=tf.Variable(0, dtype=tf.int64)
         )
         self.checkpoint_manager = tf.train.CheckpointManager(
             self.checkpoint,
@@ -56,8 +57,17 @@ class CTCTrainer:
         # Restore latest checkpoint if exists
         if self.checkpoint_manager.latest_checkpoint:
             status = self.checkpoint.restore(self.checkpoint_manager.latest_checkpoint)
+            checkpoint_variables = dict(tf.train.list_variables(
+                self.checkpoint_manager.latest_checkpoint
+            ))
+            if 'epoch/.ATTRIBUTES/VARIABLE_VALUE' not in checkpoint_variables:
+                # Older checkpoints saved batch steps but not completed epochs.
+                self.checkpoint.epoch.assign(
+                    self.checkpoint.step // NUM_BATCHES_PER_EPOCH
+                )
             print(f"Restored from {self.checkpoint_manager.latest_checkpoint}")
             print(f"Starting from step {int(self.checkpoint.step)}")
+            print(f"Completed epochs: {int(self.checkpoint.epoch)}")
         else:
             print("Starting training from scratch")
 
@@ -177,6 +187,7 @@ class CTCTrainer:
             tf.summary.scalar('loss', metrics['loss'], step=epoch)
             tf.summary.scalar('ler', metrics['ler'], step=epoch)
             tf.summary.scalar('epoch_time', metrics['time'], step=epoch)
+        self.train_writer.flush()
 
 def create_dataset_from_generator(batch_size, num_batches):
     """
@@ -336,13 +347,14 @@ def main():
     # Training loop
     train_dataset = create_training_dataset(BATCH_SIZE, NUM_BATCHES_PER_EPOCH)
     try:
-        for epoch in range(MAX_EPOCHS):
+        for epoch in range(int(trainer.checkpoint.epoch), MAX_EPOCHS):
             print("")
             print(f"Epoch {epoch + 1}/{MAX_EPOCHS}")
             print("")
 
             # Train
             metrics = trainer.train_epoch(train_dataset, epoch)
+            trainer.checkpoint.epoch.assign(epoch + 1)
 
             # Log to TensorBoard
             trainer.log_metrics(metrics, epoch)
@@ -362,7 +374,7 @@ def main():
     except KeyboardInterrupt:
         print("\n\nTraining interrupted by user")
         print("Saving final checkpoint...")
-        trainer.save_checkpoint(epoch + 1)
+        trainer.save_checkpoint(int(trainer.checkpoint.epoch))
 
     print("\nTraining completed!")
 
