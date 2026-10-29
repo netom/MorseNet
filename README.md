@@ -97,6 +97,14 @@ loads a checkpoint from `model_use`:
 
 Audio is captured at the selected device's default sample rate and resampled
 to the model's `FRAMERATE` before decoding.
+After the initial audio buffer fills, finalized characters are appended to a
+continuous transcript instead of replacing the rolling-window text.
+`LIVE_COMMIT_DELAY_SECONDS` (default: 3 seconds) holds back recent predictions;
+`LIVE_DECODE_INTERVAL_SECONDS` controls how often decoding runs. Timing-based
+CTC merging avoids duplicating overlapping output and preserves repeated
+characters separated by blanks. These settings improve output continuity but
+do not guarantee recognition accuracy; the checkpoint must match the incoming
+tone and timing conditions. The unfinalized tail is not printed on exit.
 
 ## Running with NVidia MPS
 

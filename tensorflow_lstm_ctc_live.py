@@ -16,6 +16,7 @@ from pathlib import Path
 from collections import deque
 from math import ceil, gcd
 from scipy.signal import resample_poly
+from threading import Lock
 import time
 
 # Suppress TensorFlow warnings
@@ -25,7 +26,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 from config import *
-from model import create_cw_model, ctc_decode, decoded_to_text
+from model import create_cw_model
 
 try:
     import pyaudio
@@ -49,7 +50,13 @@ class LiveDecoder:
         self.buffer_seconds = buffer_seconds
         self.buffer_chunks = (FRAMERATE * buffer_seconds) // CHUNK
         self.audio_buffer = deque(maxlen=self.buffer_chunks)
-        self.last_decoded = ""
+        self.buffer_lock = Lock()
+        self.capture_samples = 0
+        self.committed_step = None
+        self.previous_class = 0
+        self.commit_delay_steps = ceil(LIVE_COMMIT_DELAY_SECONDS * FRAMERATE / CHUNK)
+        if not 0 <= self.commit_delay_steps < self.buffer_chunks:
+            raise ValueError("Live commit delay must be shorter than the audio buffer")
 
         print("="*70)
         print("Live Morse Code Decoder - TensorFlow 2.x")
@@ -81,7 +88,7 @@ class LiveDecoder:
             device_info = self.pa.get_device_info_by_index(DEVICE)
             self.capture_rate = int(device_info['defaultSampleRate'])
             self.audio_buffer = deque(maxlen=ceil(
-                self.buffer_chunks * self.capture_rate / FRAMERATE
+                (self.buffer_chunks + 1) * self.capture_rate / FRAMERATE
             ))
             self.stream = self.pa.open(
                 format=pyaudio.paInt16,
@@ -90,7 +97,8 @@ class LiveDecoder:
                 input=True,
                 frames_per_buffer=CHUNK,
                 input_device_index=DEVICE,
-                stream_callback=self._audio_callback
+                stream_callback=self._audio_callback,
+                start=False
             )
             print(f"\nUsing device: {DEVICE}")
             print(f"Capture rate: {self.capture_rate} Hz (model: {FRAMERATE} Hz)")
@@ -125,7 +133,9 @@ class LiveDecoder:
         """Callback for audio stream."""
         # Convert bytes to numpy array
         audio_chunk = np.frombuffer(in_data, dtype=np.int16).astype(np.float32)
-        self.audio_buffer.append(audio_chunk)
+        with self.buffer_lock:
+            self.audio_buffer.append(audio_chunk)
+            self.capture_samples += len(audio_chunk)
 
         return (in_data, pyaudio.paContinue)
 
@@ -134,11 +144,18 @@ class LiveDecoder:
         Decode current audio buffer.
 
         Returns:
-            Decoded text string, or None if buffer not full
+            Newly finalized text, or None if buffer not full
         """
-        chunks = list(self.audio_buffer)
+        with self.buffer_lock:
+            chunks = list(self.audio_buffer)
+            capture_samples = self.capture_samples
         if len(chunks) < self.audio_buffer.maxlen:
             return None
+
+        end_step = capture_samples * FRAMERATE // (self.capture_rate * CHUNK)
+        commit_end = end_step - self.commit_delay_steps
+        if self.committed_step is not None and commit_end <= self.committed_step:
+            return ""
 
         # Prepare audio
         audio = np.concatenate(chunks).astype(np.float32)
@@ -146,6 +163,12 @@ class LiveDecoder:
         audio = resample_poly(
             audio, FRAMERATE // divisor, self.capture_rate // divisor
         )
+        # Align overlapping windows to the same global model-step grid.
+        trailing_samples = round(
+            capture_samples * FRAMERATE / self.capture_rate - end_step * CHUNK
+        )
+        if trailing_samples:
+            audio = audio[:-trailing_samples]
         audio = audio[-self.buffer_chunks * CHUNK:]
         audio = audio.reshape(self.buffer_chunks, CHUNK)
 
@@ -159,17 +182,28 @@ class LiveDecoder:
         # Forward pass
         logits = self.model(audio, training=False)
 
-        # Decode with greedy decoder (faster for real-time)
-        decoded, _ = ctc_decode(
-            logits,
-            sequence_length=[self.buffer_chunks],
-            beam_width=1
-        )
+        classes = np.argmax(logits[0], axis=-1)
+        if std == 0:
+            classes[:] = 0
+        return self._commit_predictions(classes, end_step - self.buffer_chunks, commit_end)
 
-        # Convert to text
-        decoded_text = decoded_to_text(decoded[0], MORSE_CHR)
+    def _commit_predictions(self, classes, start_step, commit_end):
+        """Collapse only new CTC steps, keeping repeats across window boundaries."""
+        if self.committed_step is None:
+            self.committed_step = max(0, start_step)
+        if start_step > self.committed_step:
+            print("\nWarning: decoding fell behind; some audio was skipped.", file=sys.stderr)
+            self.committed_step = start_step
+            self.previous_class = 0
 
-        return decoded_text[0]
+        text = []
+        for step in range(self.committed_step, commit_end):
+            character_class = int(classes[step - start_step])
+            if character_class != 0 and character_class != self.previous_class:
+                text.append(MORSE_CHR[character_class])
+            self.previous_class = character_class
+        self.committed_step = commit_end
+        return ''.join(text)
 
     def start(self):
         """Start live decoding."""
@@ -185,13 +219,13 @@ class LiveDecoder:
             buffer_filled = False
 
             while True:
-                time.sleep(0.5)  # Decode every 500ms
+                time.sleep(LIVE_DECODE_INTERVAL_SECONDS)
 
                 # Check if buffer is full
                 if not buffer_filled:
                     if len(self.audio_buffer) >= self.audio_buffer.maxlen:
                         buffer_filled = True
-                        print("Buffer filled. Starting decoding...\n")
+                        print("Buffer filled. Starting decoding...\nDecoded: ", end='', flush=True)
                     else:
                         progress = len(self.audio_buffer) / self.audio_buffer.maxlen * 100
                         print(f"\rBuffer: {progress:.0f}%", end='', flush=True)
@@ -200,11 +234,8 @@ class LiveDecoder:
                 # Decode
                 decoded = self.decode_buffer()
 
-                if decoded is not None:
-                    # Only print if changed
-                    if decoded != self.last_decoded:
-                        print(f"\rDecoded: {decoded}", end='', flush=True)
-                        self.last_decoded = decoded
+                if decoded:
+                    print(decoded, end='', flush=True)
 
         except KeyboardInterrupt:
             print("\n\n" + "="*70)
