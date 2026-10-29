@@ -14,6 +14,8 @@ import numpy as np
 import sys
 from pathlib import Path
 from collections import deque
+from math import ceil, gcd
+from scipy.signal import resample_poly
 import time
 
 # Suppress TensorFlow warnings
@@ -36,7 +38,7 @@ except ImportError:
 class LiveDecoder:
     """Live audio decoder for morse code."""
 
-    def __init__(self, checkpoint_dir='./model_train', buffer_seconds=12):
+    def __init__(self, checkpoint_dir=CHECKPOINT_DIR, buffer_seconds=SEQ_LENGTH_SECONDS):
         """
         Initialize live decoder.
 
@@ -76,16 +78,22 @@ class LiveDecoder:
 
         # Open audio stream
         try:
+            device_info = self.pa.get_device_info_by_index(DEVICE)
+            self.capture_rate = int(device_info['defaultSampleRate'])
+            self.audio_buffer = deque(maxlen=ceil(
+                self.buffer_chunks * self.capture_rate / FRAMERATE
+            ))
             self.stream = self.pa.open(
                 format=pyaudio.paInt16,
                 channels=1,
-                rate=FRAMERATE,
+                rate=self.capture_rate,
                 input=True,
                 frames_per_buffer=CHUNK,
                 input_device_index=DEVICE,
                 stream_callback=self._audio_callback
             )
             print(f"\nUsing device: {DEVICE}")
+            print(f"Capture rate: {self.capture_rate} Hz (model: {FRAMERATE} Hz)")
         except Exception as e:
             print(f"\nError opening audio device: {e}")
             print(f"Try changing DEVICE in config.py")
@@ -128,14 +136,22 @@ class LiveDecoder:
         Returns:
             Decoded text string, or None if buffer not full
         """
-        if len(self.audio_buffer) < self.buffer_chunks:
+        chunks = list(self.audio_buffer)
+        if len(chunks) < self.audio_buffer.maxlen:
             return None
 
         # Prepare audio
-        audio = np.array(list(self.audio_buffer), dtype=np.float32)
+        audio = np.concatenate(chunks).astype(np.float32)
+        divisor = gcd(self.capture_rate, FRAMERATE)
+        audio = resample_poly(
+            audio, FRAMERATE // divisor, self.capture_rate // divisor
+        )
+        audio = audio[-self.buffer_chunks * CHUNK:]
+        audio = audio.reshape(self.buffer_chunks, CHUNK)
 
         # Normalize
-        audio = (audio - np.mean(audio)) / np.std(audio)
+        std = np.std(audio)
+        audio = (audio - np.mean(audio)) / (std if std > 0 else 1.0)
 
         # Add batch dimension [1, timesteps, features]
         audio = np.expand_dims(audio, axis=0)
@@ -146,8 +162,8 @@ class LiveDecoder:
         # Decode with greedy decoder (faster for real-time)
         decoded, _ = ctc_decode(
             logits,
-            sequence_length=[len(self.audio_buffer)],
-            use_beam_search=False  # Use greedy for speed
+            sequence_length=[self.buffer_chunks],
+            beam_width=1
         )
 
         # Convert to text
@@ -173,11 +189,11 @@ class LiveDecoder:
 
                 # Check if buffer is full
                 if not buffer_filled:
-                    if len(self.audio_buffer) >= self.buffer_chunks:
+                    if len(self.audio_buffer) >= self.audio_buffer.maxlen:
                         buffer_filled = True
                         print("Buffer filled. Starting decoding...\n")
                     else:
-                        progress = len(self.audio_buffer) / self.buffer_chunks * 100
+                        progress = len(self.audio_buffer) / self.audio_buffer.maxlen * 100
                         print(f"\rBuffer: {progress:.0f}%", end='', flush=True)
                     continue
 
@@ -226,11 +242,11 @@ def main(args):
         print("\nConfiguration:")
         print(f"  Device: Edit DEVICE in config.py (currently: {DEVICE})")
         print(f"  Sample rate: {FRAMERATE} Hz")
-        print(f"  Buffer: 12 seconds")
+        print(f"  Buffer: {SEQ_LENGTH_SECONDS} seconds")
         sys.exit(0)
 
     try:
-        decoder = LiveDecoder(checkpoint_dir='./model_train')
+        decoder = LiveDecoder()
         decoder.start()
     except KeyboardInterrupt:
         print("\nExiting...")

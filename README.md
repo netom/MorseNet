@@ -70,6 +70,11 @@ Training progress can be observed with:
     $ tensorboard --logdir=logs
 
 Checkpoints are saved in `model_train`.
+Restarting with the same `CHECKPOINT_DIR` and `LOG_DIR` resumes the epoch
+counter and continues the TensorBoard charts. An interrupted, incomplete
+epoch is rerun from its beginning. For older checkpoints without an epoch
+counter, completed epochs are estimated from saved batch steps using the
+current `NUM_BATCHES_PER_EPOCH`.
 
 ## tensorflow_lstm_ctc_decode.py
 
@@ -90,8 +95,8 @@ loads a checkpoint from `model_use`:
 
     $ ./tensorflow_lstm_ctc_live.py
 
-Live decoding currently fails when it first tries to decode because the script
-passes an unsupported argument to the decoder.
+Audio is captured at the selected device's default sample rate and resampled
+to the model's `FRAMERATE` before decoding.
 
 ## Running with NVidia MPS
 
