@@ -4,6 +4,10 @@ DEVICE = 0
 # Live decoding: retain recent predictions before appending them to the transcript.
 LIVE_COMMIT_DELAY_SECONDS = 3.0
 LIVE_DECODE_INTERVAL_SECONDS = 0.5
+LIVE_STATEFUL_BLOCK_SECONDS = 0.5
+LIVE_NORMALIZATION_SECONDS = 3.0
+LIVE_STATEFUL_QUEUE_SECONDS = 2.0
+LIVE_STATEFUL_CPU_THREADS = 1
 
 # Used audio sampling rate
 FRAMERATE = 8000

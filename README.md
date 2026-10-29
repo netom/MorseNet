@@ -106,6 +106,43 @@ characters separated by blanks. These settings improve output continuity but
 do not guarantee recognition accuracy; the checkpoint must match the incoming
 tone and timing conditions. The unfinalized tail is not printed on exit.
 
+## tensorflow_lstm_ctc_live_stateful.py
+
+An alternative live decoder processes only new audio while retaining each
+LSTM's hidden/cell state and the CTC previous-class state:
+
+    $ python tensorflow_lstm_ctc_live_stateful.py
+    $ python tensorflow_lstm_ctc_live_stateful.py --checkpoint-dir ./model_use
+    $ python tensorflow_lstm_ctc_live_stateful.py --list-devices
+    $ python tensorflow_lstm_ctc_live_stateful.py --device 3
+
+It defaults to `CHECKPOINT_DIR` and `DEVICE` in `config.py`, captures at the
+device's default rate, and uses streaming anti-aliasing resampling. It appends
+greedy CTC output immediately, without a 12-second buffer or confirmation delay.
+`LIVE_STATEFUL_BLOCK_SECONDS` controls capture block duration;
+it defaults to 0.5 seconds to allow scheduling headroom for capture.
+`LIVE_NORMALIZATION_SECONDS` controls causal normalization adaptation.
+PyAudio must be installed, as for the original live decoder.
+
+Existing model weights are reused; the original live decoder is unchanged.
+Streaming normalization differs from training's per-sample normalization, and
+long-lived LSTM state differs from training on independent samples, so this is
+an experimental alternative, not a guarantee of better recognition. Restarting
+the script resets its network and CTC state. Audio capture runs independently
+of inference, with a bounded queue controlled by `LIVE_STATEFUL_QUEUE_SECONDS`.
+If input overflows or that queue fills, decoding reports the loss and resets
+network, CTC, and preprocessing state rather than carrying state across a gap.
+Queued blocks are processed together to catch up after temporary delays.
+`LIVE_STATEFUL_CPU_THREADS` defaults to 1 to reduce CPU scheduling contention
+with audio capture. Loss warnings distinguish PortAudio input overflow from
+an application queue overflow; an additional warning indicates if inference
+takes longer than the audio it processes.
+Persistent PortAudio input overflow occurs before the application queue;
+increasing the queue alone cannot fix it. On Linux, try an available
+`pulse` or `default` input instead of a raw `hw:` device using `--list-devices`
+and `--device`. Capture block size and actual input latency are printed at
+startup to help diagnose device buffering.
+
 ## Running with NVidia MPS
 
 See: https://docs.nvidia.com/deploy/mps/latest/index.html
