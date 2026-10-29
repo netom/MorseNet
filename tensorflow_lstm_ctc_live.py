@@ -230,7 +230,7 @@ def main(args):
         sys.exit(0)
 
     try:
-        decoder = LiveDecoder(checkpoint_dir='./model_use')
+        decoder = LiveDecoder(checkpoint_dir='./model_train')
         decoder.start()
     except KeyboardInterrupt:
         print("\nExiting...")

@@ -262,19 +262,19 @@ def save_files(dirname, seq_length, batch_size):
         n = w*i//batch_size
         sys.stdout.write("\r[%s>%s] %4d/%4d  " % ("="*n, " "*(w-n), i, batch_size))
         sys.stdout.flush()
-        filename = dirname + '/%05d.wav' % i
 
         audio, characters = generate_seq(seq_length)
 
-        # scale and convert to int
-        audio = (audio * 2**12).astype(np.int16)
+        np.save(f'{dirname}/{i:05d}.npy', audio)
 
-        scipy.io.wavfile.write(filename, FRAMERATE, audio)
+        wav_audio = (audio * 2**12).astype(np.int16)
 
-        with open(dirname + '/%05d.txt' % i, 'w') as f:
+        scipy.io.wavfile.write(f'{dirname}/{i:05d}.wav', FRAMERATE, wav_audio)
+
+        with open(f'{dirname}/{i:05d}.txt', 'w') as f:
             f.write(characters)
 
-        with open(dirname + '/config.txt', 'w') as f:
+        with open(f'{dirname}/config.txt', 'w') as f:
             f.write('%d' % seq_length)
     print("")
 
@@ -301,4 +301,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     save_files(args.dirname, args.length * FRAMERATE, args.batchsize)
-

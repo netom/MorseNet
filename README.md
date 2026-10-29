@@ -9,11 +9,11 @@ messages from raw audio data.
 
 ## Setup
 
-prepare the Python virtual environment and activate it:
+Prepare the Python virtual environment and activate it:
 
     $ . venv.sh
 
-this form will not install CUDA libraries, and explicitly disable GPU devices.
+This form does not install CUDA-enabled TensorFlow and disables GPU devices.
 
 To install CUDA libraries and enable the use of GPUs, source venv.sh WITH_CUDA
 set to a non-empty string:
@@ -28,9 +28,12 @@ restore LD_LIBRARY_PATH.
 It is both a command-line tool for debugging and a module for
 generating data for training/validation.
 
-For command line usage, issue: 
+For command line usage, issue:
 
-    $ ./generate_wav_samples.py --help"
+    $ ./generate_wav_samples.py --help
+
+The tool writes `.wav` audio, `.npy` audio, and `.txt` transcripts to the
+output directory. Use `--length SECONDS` to set the approximate sample length.
 
 ## tensorflow_lstm_ctc_train.py
 
@@ -45,23 +48,31 @@ Usage:
 
 Training progress can be observed with:
 
-    $ tensorboard --log-dir=model_train
+    $ tensorboard --logdir=logs
 
-If you're particularly happy with one of the checkpoints, copy it 
-manually into a directory called "model_use". To copy a checkpoint,
-you have to copy a meta, an index, and a data file. The checkpoint
-number and the type can be read in the files' names. A file called
-"checkpoint" is also needed. See the one in "model_training". The
-structure should be self-evident.
+Checkpoints are saved in `model_train`.
 
 ## tensorflow_lstm_ctc_decode.py
 
-Restores the latest checkpoint from the directory "model_use", and
+Restores the latest checkpoint from the directory "model_train", and
 decodes a wav file given it's name as it's sole argument.
 
     $ ./tensorflow_lstm_ctc_decode.py test.wav
 
 The decoded text will appear under a pile of TF INFO messages.
+
+The script uses beam search with width 100 by default. Its `--greedy` option
+will reduce the beam width to 1, wich is equivalent to greedy decoding.
+
+## tensorflow_lstm_ctc_live.py
+
+Captures live audio from the device configured by `DEVICE` in `config.py` and
+loads a checkpoint from `model_use`:
+
+    $ ./tensorflow_lstm_ctc_live.py
+
+Live decoding currently fails when it first tries to decode because the script
+passes an unsupported argument to the decoder.
 
 ## Running with NVidia MPS
 
@@ -82,4 +93,4 @@ You can safely run inference in an other terminal with less resources:
 
     $ export CUDA_VISIBLE_DEVICES=0
     $ export CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=512M
-    $ ./tensorflow_lstm_ctc_train.py
+    $ ./tensorflow_lstm_ctc_decode.py test.wav

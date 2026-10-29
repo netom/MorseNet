@@ -5,6 +5,7 @@ __pycache__
 *.pkl
 *.pyc
 *.npz
+*.npy
 *.pickle
 *.wav
 *.txt

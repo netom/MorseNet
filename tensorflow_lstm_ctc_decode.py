@@ -125,12 +125,12 @@ def main(args):
     if len(args) < 2:
         print("Usage: ./tensorflow_lstm_ctc_decode.py <filename.wav> [--greedy]")
         print("\nOptions:")
-        print("  --greedy: Use greedy decoder (faster but less accurate)")
+        print("  --greedy: Use beam search with width=1, a.k.a. greedy decoding (faster but less accurate)")
         print("            Default: use beam search with width=100")
         sys.exit(1)
 
     wav_file = args[1]
-    use_beam_search = '--greedy' not in args
+    beam_width = 1 if '--greedy' in args else 100
 
     print("="*70)
     print("Morse Code Decoder - TensorFlow 2.x")
@@ -173,13 +173,12 @@ def main(args):
         sys.exit(1)
 
     # Decode
-    decoder_type = "beam search (width=100)" if use_beam_search else "greedy"
-    print(f"Decoding with {decoder_type}...")
+    print(f"Decoding with beam width {beam_width}...")
 
     decoded_text, log_prob = decode_audio(
         model, audio, timesteps,
-        use_beam_search=use_beam_search,
-        beam_width=100
+        use_beam_search=True,
+        beam_width=beam_width
     )
 
     # Display results
@@ -189,7 +188,7 @@ def main(args):
     print(decoded_text if decoded_text else "(empty)")
     print("="*70)
     print(f"Log probability: {log_prob[0]:.4f}")
-    print(f"Decoder: {decoder_type}")
+    print(f"Decoder beam width {beam_width}")
     print("="*70)
 
 
