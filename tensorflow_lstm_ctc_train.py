@@ -11,13 +11,12 @@ for maximum control over the training process.
 from __future__ import generator_stop
 
 import numpy as np
-import os
 import pathlib
+import random
 import tensorflow as tf
 import time
 
 from config import *
-import generate_wav_samples as gen
 from model import create_cw_model, ctc_decode
 
 class CTCTrainer:
@@ -191,6 +190,8 @@ def create_dataset_from_generator(batch_size, num_batches):
         tf.data.Dataset
     """
 
+    import generate_wav_samples as gen
+
     dataset = tf.data.Dataset.from_generator(
         gen.seq_generator,
         output_signature=(
@@ -210,6 +211,103 @@ def create_dataset_from_generator(batch_size, num_batches):
 
     return dataset
 
+def get_saved_samples(data_dir):
+    """Return matching audio/transcript paths from a saved sample directory."""
+    data_dir = pathlib.Path(data_dir)
+    if not data_dir.is_dir():
+        raise FileNotFoundError(f"Training data directory does not exist: {data_dir}")
+
+    audio_files = {path.stem: path for path in data_dir.glob('*.npy')}
+    transcript_files = {
+        path.stem: path for path in data_dir.glob('*.txt')
+        if path.name != 'config.txt'
+    }
+
+    missing_transcripts = sorted(audio_files.keys() - transcript_files.keys())
+    missing_audio = sorted(transcript_files.keys() - audio_files.keys())
+    if missing_transcripts or missing_audio:
+        details = []
+        if missing_transcripts:
+            details.append(f"missing transcripts for: {', '.join(missing_transcripts)}")
+        if missing_audio:
+            details.append(f"missing audio for: {', '.join(missing_audio)}")
+        raise ValueError(f"Incomplete training samples in {data_dir}: {'; '.join(details)}")
+
+    samples = [
+        (audio_files[stem], transcript_files[stem])
+        for stem in sorted(audio_files)
+    ]
+    if not samples:
+        raise ValueError(f"No .npy/.txt training sample pairs found in {data_dir}")
+
+    return samples
+
+def saved_sample_generator(samples):
+    """Shuffle and load saved samples continuously, one sample at a time."""
+    while True:
+        shuffled_samples = list(samples)
+        random.shuffle(shuffled_samples)
+
+        for audio_path, transcript_path in shuffled_samples:
+            audio = np.load(audio_path, allow_pickle=False)
+            if audio.shape != (SEQ_LENGTH_FRAMES,):
+                raise ValueError(
+                    f"Invalid audio shape in {audio_path}: expected "
+                    f"({SEQ_LENGTH_FRAMES},), got {audio.shape}"
+                )
+            audio = np.reshape(audio.astype(np.float32), (TIMESTEPS, CHUNK))
+
+            characters = transcript_path.read_text(encoding='utf-8').rstrip('\r\n')
+            unknown_characters = sorted(set(characters) - MORSE_ORD.keys())
+            if unknown_characters:
+                raise ValueError(
+                    f"Unknown transcript characters in {transcript_path}: "
+                    f"{', '.join(repr(character) for character in unknown_characters)}"
+                )
+            values = np.asarray([MORSE_ORD[character] for character in characters],
+                                dtype=np.int32)
+            indices = np.reshape(np.arange(len(values), dtype=np.int64), (-1, 1))
+            dense_shape = np.asarray([len(values)], dtype=np.int64)
+            yield audio, indices, values, dense_shape
+
+def create_dataset_from_saved_samples(data_dir, batch_size, num_batches):
+    """Create a shuffled, repeating dataset from saved audio/transcript pairs."""
+    samples = get_saved_samples(data_dir)
+    print(f"Found {len(samples)} saved training samples in {data_dir}")
+
+    dataset = tf.data.Dataset.from_generator(
+        lambda: saved_sample_generator(samples),
+        output_signature=(
+            tf.TensorSpec(shape=(TIMESTEPS, CHUNK), dtype=tf.float32),
+            tf.TensorSpec(shape=(None, 1), dtype=tf.int64),
+            tf.TensorSpec(shape=(None,), dtype=tf.int32),
+            tf.TensorSpec(shape=(1,), dtype=tf.int64)
+        )
+    )
+    # Construct sparse labels in the dataset graph, not in the Python callback.
+    dataset = dataset.map(
+        lambda audio, indices, values, dense_shape: (
+            audio, tf.SparseTensor(indices, values, dense_shape)
+        )
+    )
+    dataset = dataset.batch(batch_size, drop_remainder=True)
+    dataset = dataset.take(num_batches)
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+    return dataset
+
+def create_training_dataset(batch_size, num_batches):
+    """Select the configured training input source."""
+    if TRAINING_DATA_SOURCE == 'saved':
+        return create_dataset_from_saved_samples(
+            TRAINING_DATA_DIR, batch_size, num_batches
+        )
+    if TRAINING_DATA_SOURCE == 'generated':
+        return create_dataset_from_generator(batch_size, num_batches)
+    raise ValueError(
+        "TRAINING_DATA_SOURCE must be 'saved' or 'generated', "
+        f"got {TRAINING_DATA_SOURCE!r}"
+    )
+
 def main():
     """Main training loop."""
 
@@ -218,6 +316,7 @@ def main():
     print("")
     print(f"TensorFlow version: {tf.__version__}")
     print(f"GPU available: {len(tf.config.list_physical_devices('GPU')) > 0}")
+    print(f"Training data source: {TRAINING_DATA_SOURCE}")
     print(f"Batch size: {BATCH_SIZE}")
     print(f"Batches per epoch: {NUM_BATCHES_PER_EPOCH}")
     print(f"Max epochs: {MAX_EPOCHS}")
@@ -235,7 +334,7 @@ def main():
     print("")
 
     # Training loop
-    train_dataset = create_dataset_from_generator(BATCH_SIZE, NUM_BATCHES_PER_EPOCH)
+    train_dataset = create_training_dataset(BATCH_SIZE, NUM_BATCHES_PER_EPOCH)
     try:
         for epoch in range(MAX_EPOCHS):
             print("")

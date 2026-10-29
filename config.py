@@ -103,6 +103,8 @@ SAMPLE_GENERATOR_WORKERS = 0.5
 
 # Training configuration
 
+TRAINING_DATA_SOURCE = 'saved' # 'saved' or 'generated'
+TRAINING_DATA_DIR = './samples'
 BATCH_SIZE = 200
 NUM_BATCHES_PER_EPOCH = 100
 MAX_EPOCHS = 10000
