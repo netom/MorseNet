@@ -5,8 +5,8 @@ from config import *
 
 # TODO: dropout
 def create_cw_model(
-    input_widths=[],
-    recurrent_widths=[128],
+    input_widths=[64],
+    recurrent_widths=[256],
     output_widths=[NUM_CLASSES],
 ):
     layers = []
@@ -15,7 +15,7 @@ def create_cw_model(
         layers.append(tf.keras.layers.Dense(
             width,
             kernel_regularizer = tf.keras.regularizers.L2(L2_LAMBDA),
-            activation=None,
+            activation='tanh',
             name=f'input_{i}'
         ))
 
