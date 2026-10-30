@@ -23,27 +23,32 @@ set to a non-empty string:
 `venv.sh` also sets up `LD_LIBRARY_PATH`. Running `deactivate` restores its
 previous value.
 
-## generate_samples.py
+## dataset.py
 
 This command-line tool generates synthetic training samples.
 
 For command line usage, issue:
 
-    $ ./generate_samples.py --help
+    $ ./dataset.py --help
 
-For example, to generate samples numbered 0 to 999 in `./dataset`:
+For example, to generate training samples numbered 0 to 999 in
+`./dataset/train`:
 
-    $ ./generate_samples.py 1000
+    $ ./dataset.py 1000
 
-To add samples numbered 1000 to 1999 to an existing corpus:
+To generate 200 test samples numbered 0 to 199 in `./dataset/test`:
 
-    $ ./generate_samples.py 2000 --from-index 1000
+    $ ./dataset.py 200 --split test
+
+To add training samples numbered 1000 to 1999:
+
+    $ ./dataset.py 2000 --from-index 1000
 
 The tool writes `.wav` audio, `.npy` audio, and `.txt` transcripts to the
-output directory (`--dirname`, default: `TRAINING_DATA_DIR` from `config.py`,
-i.e. `./dataset`). Existing files with the same indices are overwritten. Use
-`--length SECONDS` to set the sample duration. Training reads matching `.npy`
-audio and `.txt` transcript files from `TRAINING_DATA_DIR`.
+directory for `--split` (`train` or `test`; defaults to `train`). `--dirname`
+overrides that directory. Existing files with the same indices are overwritten.
+Use `--length SECONDS` to set the sample duration. Training expects the
+configured `SEQ_LENGTH_SECONDS` (12 seconds by default).
 
 ## train.py
 
@@ -55,21 +60,25 @@ Usage:
 
     $ ./train.py
 
-By default, training uses the saved samples in `./dataset`. Generate a corpus
-before training if needed:
+By default, training uses `./dataset/train` and evaluates on `./dataset/test`.
+Generate data for both splits before training:
 
-    $ ./generate_samples.py 1000
+    $ ./dataset.py 1000 --split train
+    $ ./dataset.py 200 --split test
 
-Set `TRAINING_DATA_DIR` in `config.py` to use another directory. Samples are
-parsed and batched by a `tf.data` pipeline with parallel file reading. Each
-`.npy` audio file must contain exactly the configured sample length as float32
-(as written by `generate_samples.py`) and have a `.txt` transcript with the
-same filename stem. Invalid sample sizes or transcript characters stop training
-with an error identifying the audio file; missing transcripts are reported by
-TensorFlow when the corresponding file is read. The dataset is shuffled and
-repeated to provide `NUM_BATCHES_PER_EPOCH`, so a small corpus is reused within
-an epoch. `BATCH_SIZE` remains configurable, and the corpus does not need to be
-an exact multiple of it.
+Set `TRAINING_DATA_DIR` and `TEST_DATA_DIR` in `config.py` to use other
+directories. Samples are parsed and batched by a `tf.data` pipeline with
+parallel file reading. Each `.npy` audio file must contain exactly the
+configured sample length as float32
+(as written by `dataset.py`) and have a `.txt` transcript with the
+same filename stem. Invalid sample sizes or transcript characters stop loading
+with an error identifying the audio file; missing or unmatched transcripts are
+reported before training starts. The training dataset is shuffled and repeated
+to provide `NUM_BATCHES_PER_EPOCH`, so a small corpus is reused within an epoch.
+Each test sample is evaluated once per epoch without updating model weights,
+including any final partial batch. `BATCH_SIZE` remains configurable, and
+neither split needs to be an exact multiple of it. Both split directories must
+exist and contain matched `.npy`/`.txt` pairs.
 
 Training progress can be observed with:
 
@@ -80,6 +89,7 @@ Checkpoints are saved in `model`. Restarting with the same
 TensorBoard charts. An interrupted, incomplete epoch is rerun from its
 beginning. For older checkpoints without an epoch counter, completed epochs are
 estimated from saved batch steps using the current `NUM_BATCHES_PER_EPOCH`.
+TensorBoard also records `test_loss` and `test_ler` for the held-out split.
 
 ## decode.py
 

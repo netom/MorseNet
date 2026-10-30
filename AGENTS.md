@@ -4,8 +4,9 @@
 
 MorseNet is a TensorFlow 2.x research project for decoding Morse code from raw
 audio using LSTM neural networks and CTC (Connectionist Temporal
-Classification) loss. Training data is synthetic, generated ahead of time into
-`dataset/` and loaded from there.
+Classification) loss. Synthetic data is generated ahead of time into
+`dataset/train/` and `dataset/test/`; training uses the first split and
+evaluates on the second.
 
 ## Setup
 
@@ -39,7 +40,7 @@ tensorboard --logdir=logs
 ./decode_live.py
 
 # Generate synthetic WAV samples:
-./generate_samples.py <to_index> [--from-index N] [--dirname DIR] [--length SECONDS]
+./dataset.py <to_index> [--split train|test] [--from-index N] [--dirname DIR] [--length SECONDS]
 ```
 
 There are no automated tests.
@@ -49,14 +50,16 @@ There are no automated tests.
 Shared configuration values are defined in **`config.py`**. Scripts import the
 values they use; most model and training scripts use `from config import *`.
 
-### Data pipeline (`generate_samples.py`)
+### Data pipeline (`dataset.py`)
 - Generates synthetic CW audio: a sine tone (500–700 Hz) with timing
 jitter, white noise, impulse noise, QSB fading, and bandpass filtering.
 - Timing constants: `CHUNK=256` samples/step, `FRAMERATE=8000` Hz →
 `TIMESTEPS=375` steps per 12-second sample.
 - `save_files()` writes each sample as `.npy` (float32 audio), `.wav` and
 `.txt` (transcript) into the output directory. `train.py` loads the `.npy`/`.txt`
-pairs from `TRAINING_DATA_DIR`; there is no on-the-fly generation.
+pairs from `TRAINING_DATA_DIR` and evaluates with `TEST_DATA_DIR`; there is no
+on-the-fly generation. `--split test` selects the test directory when
+generating samples.
 - Normalization `(x - mean) / std` is applied per-sample before the model.
 
 ### Model (`model.py`)
@@ -76,6 +79,9 @@ required by TensorFlow's beam-search decoder.
 `tf.train.CheckpointManager`.
 - LER (Label Error Rate) is computed with `tf.edit_distance` using
 `ctc_decode()` with beam width 1 during training for speed.
+- Each epoch evaluates test loss and LER without applying gradients.
+- Samples are stored in `dataset/train/` and `dataset/test/`; generation uses
+`--split train` or `--split test`, and test samples are evaluated once per epoch.
 
 ### Inference
 - **`decode.py`**: loads the latest checkpoint from
@@ -100,5 +106,5 @@ and the CTC blank index (`0`) depend on the list order in `config.py`. Do not
 reorder it.
 - Audio input shape into the model: `[batch, TIMESTEPS, CHUNK]` (batch-major,
 not time-major).
-- The `generate_samples.py` module is dual-purpose: importable library
+- The `dataset.py` module is dual-purpose: importable library
 (`generate_seq`, `save_files`) and a standalone CLI tool.

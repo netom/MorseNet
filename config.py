@@ -101,7 +101,8 @@ CHARS = {
 
 # Training configuration
 
-TRAINING_DATA_DIR = './dataset'
+TRAINING_DATA_DIR = './dataset/train'
+TEST_DATA_DIR = './dataset/test'
 BATCH_SIZE = 500
 NUM_BATCHES_PER_EPOCH = 100
 MAX_EPOCHS = 10000

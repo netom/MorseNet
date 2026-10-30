@@ -115,6 +115,30 @@ class CTCTrainer:
 
         return loss, ler
 
+    @tf.function
+    def test_step(self, audio, labels, input_length, label_length):
+        """Calculate CTC loss and LER without updating model weights."""
+        logits = self.model(audio, training=False)
+        loss = tf.reduce_mean(tf.nn.ctc_loss(
+            labels=labels,
+            logits=logits,
+            label_length=label_length,
+            logit_length=input_length,
+            logits_time_major=False,
+            blank_index=0
+        ))
+
+        decoded, _ = ctc_decode(
+            logits,
+            sequence_length=input_length,
+            beam_width=1
+        )
+        ler = tf.reduce_mean(tf.edit_distance(
+            tf.cast(decoded[0], tf.int32),
+            labels
+        ))
+        return loss, ler
+
     def train_epoch(self, dataset, epoch):
         """
         Train for one epoch.
@@ -173,6 +197,31 @@ class CTCTrainer:
             'time': epoch_time
         }
 
+    def evaluate_epoch(self, dataset):
+        """Evaluate a dataset without applying gradients or changing weights."""
+        loss_metric = tf.keras.metrics.Mean()
+        ler_metric = tf.keras.metrics.Mean()
+        start_time = time.time()
+
+        for audio, labels in dataset:
+            batch_size = tf.shape(audio)[0]
+            input_length = tf.fill([batch_size], TIMESTEPS)
+            label_length = tf.math.bincount(
+                tf.cast(labels.indices[:, 0], tf.int32),
+                minlength=batch_size,
+                maxlength=batch_size
+            )
+            loss, ler = self.test_step(audio, labels, input_length, label_length)
+            sample_weight = tf.cast(batch_size, tf.float32)
+            loss_metric.update_state(loss, sample_weight=sample_weight)
+            ler_metric.update_state(ler, sample_weight=sample_weight)
+
+        return {
+            'loss': loss_metric.result().numpy(),
+            'ler': ler_metric.result().numpy(),
+            'time': time.time() - start_time
+        }
+
     def save_checkpoint(self, epoch):
         """Save model checkpoint."""
         save_path = self.checkpoint_manager.save()
@@ -187,13 +236,47 @@ class CTCTrainer:
             tf.summary.scalar('epoch_time', metrics['time'], step=epoch)
         self.train_writer.flush()
 
+    def log_test_metrics(self, metrics, epoch):
+        """Log test metrics to TensorBoard."""
+        with self.train_writer.as_default():
+            tf.summary.scalar('test_loss', metrics['loss'], step=epoch)
+            tf.summary.scalar('test_ler', metrics['ler'], step=epoch)
+            tf.summary.scalar('test_epoch_time', metrics['time'], step=epoch)
+        self.train_writer.flush()
+
 # Size of the header np.save writes in front of the data of a 1-D float32 array
 NPY_HEADER_BYTES = 128
 
-def create_dataset_from_saved_samples(data_dir, batch_size, num_batches):
+def validate_sample_directory(data_dir):
+    """Fail early if a split is missing or has unmatched audio/transcripts."""
+    data_dir = pathlib.Path(data_dir)
+    if not data_dir.is_dir():
+        raise FileNotFoundError(f"Dataset split directory does not exist: {data_dir}")
+
+    audio_stems = {path.stem for path in data_dir.glob('*.npy')}
+    transcript_stems = {
+        path.stem for path in data_dir.glob('*.txt')
+        if path.name != 'config.txt'
+    }
+    if not audio_stems:
+        raise ValueError(f"No .npy samples found in dataset split: {data_dir}")
+    missing_transcripts = sorted(audio_stems - transcript_stems)
+    missing_audio = sorted(transcript_stems - audio_stems)
+    if missing_transcripts or missing_audio:
+        details = []
+        if missing_transcripts:
+            details.append(f"missing transcripts for {', '.join(missing_transcripts[:5])}")
+        if missing_audio:
+            details.append(f"missing audio for {', '.join(missing_audio[:5])}")
+        raise ValueError(f"Incomplete dataset split {data_dir}: {'; '.join(details)}")
+    return len(audio_stems)
+
+def create_dataset_from_saved_samples(
+    data_dir, batch_size, num_batches=None, shuffle=True, repeat=False,
+    drop_remainder=False
+):
     """
-    Create a shuffled, repeating dataset from saved .npy audio / .txt
-    transcript.
+    Build a tf.data pipeline for saved .npy audio / .txt transcript pairs.
     """
     char_table = tf.lookup.StaticHashTable(
         tf.lookup.KeyValueTensorInitializer(
@@ -223,15 +306,24 @@ def create_dataset_from_saved_samples(data_dir, batch_size, num_batches):
         )
         return audio, labels
 
-    return (
-        tf.data.Dataset.list_files(f'{data_dir}/*.npy', shuffle=True)
-        .repeat()
-        .map(load_sample, num_parallel_calls=tf.data.AUTOTUNE, deterministic=False)
-        .ragged_batch(batch_size, drop_remainder=True)
+    sample_count = validate_sample_directory(data_dir)
+    print(f"Found {sample_count} samples in {data_dir}")
+    dataset = tf.data.Dataset.list_files(f'{data_dir}/*.npy', shuffle=shuffle)
+    if repeat:
+        dataset = dataset.repeat()
+    dataset = (
+        dataset
+        .map(
+            load_sample,
+            num_parallel_calls=tf.data.AUTOTUNE,
+            deterministic=not shuffle
+        )
+        .ragged_batch(batch_size, drop_remainder=drop_remainder)
         .map(lambda audio, labels: (audio, labels.to_sparse()))
-        .take(num_batches)
-        .prefetch(tf.data.AUTOTUNE)
     )
+    if num_batches is not None:
+        dataset = dataset.take(num_batches)
+    return dataset.prefetch(tf.data.AUTOTUNE)
 
 def main():
     """Main training loop."""
@@ -242,6 +334,7 @@ def main():
     print(f"TensorFlow version: {tf.__version__}")
     print(f"GPU available: {len(tf.config.list_physical_devices('GPU')) > 0}")
     print(f"Training data dir: {TRAINING_DATA_DIR}")
+    print(f"Test data dir: {TEST_DATA_DIR}")
     print(f"Batch size: {BATCH_SIZE}")
     print(f"Batches per epoch: {NUM_BATCHES_PER_EPOCH}")
     print(f"Max epochs: {MAX_EPOCHS}")
@@ -260,7 +353,11 @@ def main():
 
     # Training loop
     train_dataset = create_dataset_from_saved_samples(
-        TRAINING_DATA_DIR, BATCH_SIZE, NUM_BATCHES_PER_EPOCH
+        TRAINING_DATA_DIR, BATCH_SIZE, NUM_BATCHES_PER_EPOCH,
+        repeat=True, drop_remainder=True
+    )
+    test_dataset = create_dataset_from_saved_samples(
+        TEST_DATA_DIR, BATCH_SIZE, shuffle=False
     )
     try:
         for epoch in range(int(trainer.checkpoint.epoch), MAX_EPOCHS):
@@ -270,10 +367,12 @@ def main():
 
             # Train
             metrics = trainer.train_epoch(train_dataset, epoch)
+            test_metrics = trainer.evaluate_epoch(test_dataset)
             trainer.checkpoint.epoch.assign(epoch + 1)
 
             # Log to TensorBoard
             trainer.log_metrics(metrics, epoch)
+            trainer.log_test_metrics(test_metrics, epoch)
 
             # Print epoch summary
             print("")
@@ -281,6 +380,10 @@ def main():
             print(f"  Loss:     {metrics['loss']:.4f}")
             print(f"  LER:      {metrics['ler']:.4f}")
             print(f"  Time:     {metrics['time']:.2f}s")
+            print("Test:")
+            print(f"  Loss:     {test_metrics['loss']:.4f}")
+            print(f"  LER:      {test_metrics['ler']:.4f}")
+            print(f"  Time:     {test_metrics['time']:.2f}s")
             print(f"")
 
             # Save checkpoint every 5 epochs
