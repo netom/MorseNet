@@ -189,39 +189,6 @@ class CTCTrainer:
             tf.summary.scalar('epoch_time', metrics['time'], step=epoch)
         self.train_writer.flush()
 
-def create_dataset_from_generator(batch_size, num_batches):
-    """
-    Create tf.data.Dataset from generator.
-
-    Args:
-        batch_size: Number of samples per batch
-        num_batches: Number of batches per epoch
-
-    Returns:
-        tf.data.Dataset
-    """
-
-    import generate_samples as gen
-
-    dataset = tf.data.Dataset.from_generator(
-        gen.seq_generator,
-        output_signature=(
-            tf.TensorSpec(shape=(TIMESTEPS, CHUNK), dtype=tf.float32),
-            tf.SparseTensorSpec(shape=(None,), dtype=tf.int32)
-        )
-    )
-
-    # Batch the dataset
-    dataset = dataset.batch(batch_size, drop_remainder=True)
-
-    # Limit to num_batches
-    dataset = dataset.take(num_batches)
-
-    # Prefetch for performance
-    dataset = dataset.prefetch(tf.data.AUTOTUNE)
-
-    return dataset
-
 def get_saved_samples(data_dir):
     """Return matching audio/transcript paths from a saved sample directory."""
     data_dir = pathlib.Path(data_dir)
@@ -306,19 +273,6 @@ def create_dataset_from_saved_samples(data_dir, batch_size, num_batches):
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
     return dataset
 
-def create_training_dataset(batch_size, num_batches):
-    """Select the configured training input source."""
-    if TRAINING_DATA_SOURCE == 'saved':
-        return create_dataset_from_saved_samples(
-            TRAINING_DATA_DIR, batch_size, num_batches
-        )
-    if TRAINING_DATA_SOURCE == 'generated':
-        return create_dataset_from_generator(batch_size, num_batches)
-    raise ValueError(
-        "TRAINING_DATA_SOURCE must be 'saved' or 'generated', "
-        f"got {TRAINING_DATA_SOURCE!r}"
-    )
-
 def main():
     """Main training loop."""
 
@@ -327,7 +281,7 @@ def main():
     print("")
     print(f"TensorFlow version: {tf.__version__}")
     print(f"GPU available: {len(tf.config.list_physical_devices('GPU')) > 0}")
-    print(f"Training data source: {TRAINING_DATA_SOURCE}")
+    print(f"Training data dir: {TRAINING_DATA_DIR}")
     print(f"Batch size: {BATCH_SIZE}")
     print(f"Batches per epoch: {NUM_BATCHES_PER_EPOCH}")
     print(f"Max epochs: {MAX_EPOCHS}")
@@ -345,7 +299,9 @@ def main():
     print("")
 
     # Training loop
-    train_dataset = create_training_dataset(BATCH_SIZE, NUM_BATCHES_PER_EPOCH)
+    train_dataset = create_dataset_from_saved_samples(
+        TRAINING_DATA_DIR, BATCH_SIZE, NUM_BATCHES_PER_EPOCH
+    )
     try:
         for epoch in range(int(trainer.checkpoint.epoch), MAX_EPOCHS):
             print("")

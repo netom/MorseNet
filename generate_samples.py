@@ -1,23 +1,14 @@
 #!/usr/bin/env python3
 
-import multiprocessing
+import argparse
 import numpy as np
-import queue
+import os
 import random
+import scipy.io.wavfile
 import scipy.signal as sig
-import tensorflow as tf
-import threading
+import sys
 
 from config import *
-
-if SAMPLE_GENERATOR_WORKER_TYPE == 'process':
-    Worker = multiprocessing.Process
-    Queue  = multiprocessing.Queue 
-elif SAMPLE_GENERATOR_WORKER_TYPE == 'thread':
-    Worker = threading.Thread
-    Queue  = queue.Queue
-else:
-    raise Exception(f"")
 
 # Spectral inversion for FIR filters
 def spectinvert(taps):
@@ -199,60 +190,6 @@ def generate_seq(seq_length, framerate=FRAMERATE):
     # All DSP above runs in float64; emit float32 (the training precision)
     return s.astype(np.float32), ''.join(characters)
 
-# List of worker processes or threads
-workers = []
-
-work_queue = Queue(BATCH_SIZE * 2)
-
-def dowork():
-    global work_queue
-
-    while True:
-        audio, characters = generate_seq(SEQ_LENGTH_FRAMES, FRAMERATE)
-
-        audio = np.reshape(audio,  (SEQ_LENGTH_FRAMES // CHUNK, CHUNK))
-
-        indices = np.asarray(range(len(characters)), dtype=np.int64)
-        indices = np.reshape(indices, (len(indices),1))
-
-        values = np.asarray([MORSE_ORD[c] for c in characters], dtype=np.int32)
-        dense_shape = np.asarray([SEQ_MAX_CHARS], dtype=np.int64)
-
-        work_queue.put((audio, indices, values, dense_shape))
-
-def start_workers():
-    global workers
-
-    if len(workers) > 0:
-        return
-
-    num_workers = SAMPLE_GENERATOR_WORKERS
-
-    if num_workers < 0:
-        raise Exception(f'Number of workers must be greater than 0, got {num_workers}')
-
-    if type(num_workers) == float:
-        num_workers = round(multiprocessing.cpu_count() * num_workers)
-
-    for i in range(num_workers):
-        w = Worker(target=dowork)
-        w.daemon=True
-        workers.append(w)
-        w.start()
-
-# A generator yielding an audio array, and a sparse tensor of lablels for CTC
-# functions
-def seq_generator():
-    start_workers()
-    while True:
-        audio, indices, values, dense_shape = work_queue.get()
-        sparse_label = tf.SparseTensor(
-            indices=indices,
-            values=values,
-            dense_shape=dense_shape
-        )
-        yield audio, sparse_label
-
 def save_files(dirname, seq_length, batch_size):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
@@ -279,11 +216,6 @@ def save_files(dirname, seq_length, batch_size):
     print("")
 
 if __name__ == "__main__":
-    import os
-    import sys
-    import argparse
-    import scipy.io.wavfile
-
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument(
         'dirname', metavar='DIRNAME', type=str,

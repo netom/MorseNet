@@ -4,7 +4,8 @@
 
 MorseNet is a TensorFlow 2.x research project for decoding Morse code from raw
 audio using LSTM neural networks and CTC (Connectionist Temporal
-Classification) loss. Training data is generated synthetically on-the-fly.
+Classification) loss. Training data is synthetic, generated ahead of time into
+`samples/` and loaded from there.
 
 ## Setup
 
@@ -49,13 +50,13 @@ Shared configuration values are defined in **`config.py`**. Scripts import the
 values they use; most model and training scripts use `from config import *`.
 
 ### Data pipeline (`generate_samples.py`)
-- Generates synthetic CW audio on-the-fly: a sine tone (500–700 Hz) with timing
+- Generates synthetic CW audio: a sine tone (500–700 Hz) with timing
 jitter, white noise, impulse noise, QSB fading, and bandpass filtering.
 - Timing constants: `CHUNK=256` samples/step, `FRAMERATE=8000` Hz →
 `TIMESTEPS=375` steps per 12-second sample.
-- `seq_generator()` is a Python generator that feeds a shared work queue filled
-by worker processes or threads (controlled by `SAMPLE_GENERATOR_WORKER_TYPE`
-and `SAMPLE_GENERATOR_WORKERS` in `config.py`).
+- `save_files()` writes each sample as `.npy` (float32 audio), `.wav` and
+`.txt` (transcript) into the output directory. `train.py` loads the `.npy`/`.txt`
+pairs from `TRAINING_DATA_DIR`; there is no on-the-fly generation.
 - Normalization `(x - mean) / std` is applied per-sample before the model.
 
 ### Model (`model.py`)
@@ -100,4 +101,4 @@ reorder it.
 - Audio input shape into the model: `[batch, TIMESTEPS, CHUNK]` (batch-major,
 not time-major).
 - The `generate_samples.py` module is dual-purpose: importable library
-(`seq_generator`, `generate_seq`) and a standalone CLI tool.
+(`generate_seq`, `save_files`) and a standalone CLI tool.

@@ -52,17 +52,12 @@ before training if needed:
 
     $ ./generate_samples.py ./samples 1000
 
-Set `TRAINING_DATA_DIR` in `config.py` to use another directory. Set
-`TRAINING_DATA_SOURCE = 'generated'` to use the original on-the-fly synthetic
-generator instead; the default `'saved'` mode does not start generator workers.
-The loader requires each `.npy` audio file to have the configured sample length
-and a `.txt` transcript with the same filename stem. The dataset is shuffled
-and repeated to provide `NUM_BATCHES_PER_EPOCH`, so a small corpus is reused
-within an epoch. `BATCH_SIZE` remains configurable, and the corpus does not
-need to be an exact multiple of it.
-
-For comparisons between input modes, set separate `CHECKPOINT_DIR` and
-`LOG_DIR` values so training artifacts are not mixed.
+Set `TRAINING_DATA_DIR` in `config.py` to use another directory. The loader
+requires each `.npy` audio file to have the configured sample length and a
+`.txt` transcript with the same filename stem. The dataset is shuffled and
+repeated to provide `NUM_BATCHES_PER_EPOCH`, so a small corpus is reused within
+an epoch. `BATCH_SIZE` remains configurable, and the corpus does not need to be
+an exact multiple of it.
 
 Training progress can be observed with:
 
