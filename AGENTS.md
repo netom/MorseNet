@@ -39,7 +39,7 @@ tensorboard --logdir=logs
 ./decode_live.py
 
 # Generate synthetic WAV samples:
-./generate_samples.py <output_dir> <count> [--length SECONDS]
+./generate_samples.py <to_index> [--from-index N] [--dirname DIR] [--length SECONDS]
 ```
 
 There are no automated tests.

@@ -32,10 +32,20 @@ For command line usage, issue:
 
     $ ./generate_samples.py --help
 
+For example, to generate samples numbered 0 to 999 in `./samples`:
+
+    $ ./generate_samples.py 1000
+
+To add samples numbered 1000 to 1999 to an existing corpus:
+
+    $ ./generate_samples.py 2000 --from-index 1000
+
 The tool writes `.wav` audio, `.npy` audio, and `.txt` transcripts to the
-output directory. Use `--length SECONDS` to set the approximate sample length.
+output directory (`--dirname`, default: `TRAINING_DATA_DIR` from `config.py`,
+i.e. `./samples`). Existing files with the same indices are overwritten. Use
+`--length SECONDS` to set the approximate sample length.
 Training reads matching `.npy` audio and `.txt` transcript files from
-`TRAINING_DATA_DIR` (default: `./samples`).
+`TRAINING_DATA_DIR`.
 
 ## train.py
 
@@ -50,7 +60,7 @@ Usage:
 By default, training uses the saved samples in `./samples`. Generate a corpus
 before training if needed:
 
-    $ ./generate_samples.py ./samples 1000
+    $ ./generate_samples.py 1000
 
 Set `TRAINING_DATA_DIR` in `config.py` to use another directory. The loader
 requires each `.npy` audio file to have the configured sample length and a

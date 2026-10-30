@@ -190,14 +190,15 @@ def generate_seq(seq_length, framerate=FRAMERATE):
     # All DSP above runs in float64; emit float32 (the training precision)
     return s.astype(np.float32), ''.join(characters)
 
-def save_files(dirname, seq_length, batch_size):
+def save_files(dirname, seq_length, from_index, to_index):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-    for i in range(batch_size):
+    count = to_index - from_index
+    for i in range(from_index, to_index):
         w = 20
-        n = w*i//batch_size
-        sys.stdout.write("\r[%s>%s] %4d/%4d  " % ("="*n, " "*(w-n), i, batch_size))
+        n = w*(i - from_index)//count
+        sys.stdout.write("\r[%s>%s] %4d/%4d  " % ("="*n, " "*(w-n), i - from_index, count))
         sys.stdout.flush()
 
         audio, characters = generate_seq(seq_length)
@@ -216,20 +217,33 @@ def save_files(dirname, seq_length, batch_size):
     print("")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument(
-        'dirname', metavar='DIRNAME', type=str,
-        help='name of the directory into wich the output .wav files are to be saved'
+    parser = argparse.ArgumentParser(
+        description='Generate synthetic Morse samples (.npy, .wav and .txt files) '
+                    'numbered FROM_INDEX up to, but not including, TO_INDEX.'
     )
     parser.add_argument(
-        'batchsize', metavar='BATCHSIZE', type=int,
-        help='the number of examples to generate'
+        'to_index', metavar='TO_INDEX', type=int,
+        help='the index at which to stop (exclusive); with the default '
+             '--from-index this is the number of samples to generate'
+    )
+    parser.add_argument(
+        '--from-index', metavar='FROM_INDEX', type=int, default=0,
+        help='the index of the first sample to generate (default: %(default)s)'
+    )
+    parser.add_argument(
+        '--dirname', metavar='DIRNAME', type=str, default=TRAINING_DATA_DIR,
+        help='name of the directory into which the output files are to be saved '
+             '(default: %(default)s)'
     )
     parser.add_argument(
         '--length', metavar='LENGTH', type=int, default=SEQ_LENGTH_SECONDS,
-        help='the approximate length of the samples in whole seconds'
+        help='the approximate length of the samples in whole seconds '
+             '(default: %(default)s)'
     )
 
     args = parser.parse_args()
 
-    save_files(args.dirname, args.length * FRAMERATE, args.batchsize)
+    if args.from_index < 0 or args.from_index >= args.to_index:
+        parser.error('FROM_INDEX must be non-negative and less than TO_INDEX')
+
+    save_files(args.dirname, args.length * FRAMERATE, args.from_index, args.to_index)
