@@ -201,7 +201,7 @@ def create_dataset_from_generator(batch_size, num_batches):
         tf.data.Dataset
     """
 
-    import generate_wav_samples as gen
+    import generate_samples as gen
 
     dataset = tf.data.Dataset.from_generator(
         gen.seq_generator,

@@ -1,9 +1,7 @@
 # Sound device used to play samples
 DEVICE = 0
 
-# Live decoding: retain recent predictions before appending them to the transcript.
-LIVE_COMMIT_DELAY_SECONDS = 3.0
-LIVE_DECODE_INTERVAL_SECONDS = 0.5
+# Live decoding
 LIVE_STATEFUL_BLOCK_SECONDS = 0.5
 LIVE_NORMALIZATION_SECONDS = 3.0
 LIVE_STATEFUL_QUEUE_SECONDS = 2.0

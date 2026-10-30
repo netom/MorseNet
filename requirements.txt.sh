@@ -10,6 +10,7 @@ fi
 
 cat <<EOF
 numpy==2.4.6
+pyaudio==0.2.14
 scipy==1.17.1
 setuptools==81.0.0
 tensorboard==2.20.0

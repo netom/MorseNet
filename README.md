@@ -23,21 +23,21 @@ set to a non-empty string:
 venv.sh also sets up LD_LIBRARY_PATH. Running the "deactivate" command will
 restore LD_LIBRARY_PATH.
 
-## generate_wav_samples.py
+## generate_samples.py
 
 It is both a command-line tool for debugging and a module for
 generating data for training/validation.
 
 For command line usage, issue:
 
-    $ ./generate_wav_samples.py --help
+    $ ./generate_samples.py --help
 
 The tool writes `.wav` audio, `.npy` audio, and `.txt` transcripts to the
 output directory. Use `--length SECONDS` to set the approximate sample length.
 Training reads matching `.npy` audio and `.txt` transcript files from
 `TRAINING_DATA_DIR` (default: `./samples`).
 
-## tensorflow_lstm_ctc_train.py
+## train.py
 
 Builds and trains a simple neural network with LSTM unit(s) using CTC
 as the loss function. The input is chunked raw audio. The model
@@ -46,12 +46,12 @@ called "model_train".
 
 Usage:
 
-    $ ./tensorflow_lstm_ctc_train.py
+    $ ./train.py
 
 By default, training uses the saved samples in `./samples`. Generate a corpus
 before training if needed:
 
-    $ ./generate_wav_samples.py ./samples 1000
+    $ ./generate_samples.py ./samples 1000
 
 Set `TRAINING_DATA_DIR` in `config.py` to use another directory. Set
 `TRAINING_DATA_SOURCE = 'generated'` to use the original on-the-fly synthetic
@@ -76,45 +76,27 @@ epoch is rerun from its beginning. For older checkpoints without an epoch
 counter, completed epochs are estimated from saved batch steps using the
 current `NUM_BATCHES_PER_EPOCH`.
 
-## tensorflow_lstm_ctc_decode.py
+## decode.py
 
 Restores the latest checkpoint from the directory "model_train", and
 decodes a wav file given it's name as it's sole argument.
 
-    $ ./tensorflow_lstm_ctc_decode.py test.wav
+    $ ./decode.py test.wav
 
 The decoded text will appear under a pile of TF INFO messages.
 
 The script uses beam search with width 100 by default. Its `--greedy` option
 will reduce the beam width to 1, wich is equivalent to greedy decoding.
 
-## tensorflow_lstm_ctc_live.py
+## decode_live.py
 
-Captures live audio from the device configured by `DEVICE` in `config.py` and
-loads a checkpoint from `model_use`:
-
-    $ ./tensorflow_lstm_ctc_live.py
-
-Audio is captured at the selected device's default sample rate and resampled
-to the model's `FRAMERATE` before decoding.
-After the initial audio buffer fills, finalized characters are appended to a
-continuous transcript instead of replacing the rolling-window text.
-`LIVE_COMMIT_DELAY_SECONDS` (default: 3 seconds) holds back recent predictions;
-`LIVE_DECODE_INTERVAL_SECONDS` controls how often decoding runs. Timing-based
-CTC merging avoids duplicating overlapping output and preserves repeated
-characters separated by blanks. These settings improve output continuity but
-do not guarantee recognition accuracy; the checkpoint must match the incoming
-tone and timing conditions. The unfinalized tail is not printed on exit.
-
-## tensorflow_lstm_ctc_live_stateful.py
-
-An alternative live decoder processes only new audio while retaining each
+The live decoder processes only new audio while retaining each
 LSTM's hidden/cell state and the CTC previous-class state:
 
-    $ python tensorflow_lstm_ctc_live_stateful.py
-    $ python tensorflow_lstm_ctc_live_stateful.py --checkpoint-dir ./model_use
-    $ python tensorflow_lstm_ctc_live_stateful.py --list-devices
-    $ python tensorflow_lstm_ctc_live_stateful.py --device 3
+    $ python decode_live.py
+    $ python decode_live.py --checkpoint-dir ./model_use
+    $ python decode_live.py --list-devices
+    $ python decode_live.py --device 3
 
 It defaults to `CHECKPOINT_DIR` and `DEVICE` in `config.py`, captures at the
 device's default rate, and uses streaming anti-aliasing resampling. It appends
@@ -122,10 +104,9 @@ greedy CTC output immediately, without a 12-second buffer or confirmation delay.
 `LIVE_STATEFUL_BLOCK_SECONDS` controls capture block duration;
 it defaults to 0.5 seconds to allow scheduling headroom for capture.
 `LIVE_NORMALIZATION_SECONDS` controls causal normalization adaptation.
-PyAudio must be installed, as for the original live decoder.
+PyAudio must be installed.
 
-Existing model weights are reused; the original live decoder is unchanged.
-Streaming normalization differs from training's per-sample normalization, and
+Existing model weights are reused. Streaming normalization differs from training's per-sample normalization, and
 long-lived LSTM state differs from training on independent samples, so this is
 an experimental alternative, not a guarantee of better recognition. Restarting
 the script resets its network and CTC state. Audio capture runs independently
@@ -156,10 +137,10 @@ Set up the environment in another terminal:
 
     $ export CUDA_VISIBLE_DEVICES=0
     $ export CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=2G
-    $ ./tensorflow_lstm_ctc_train.py
+    $ ./train.py
 
 You can safely run inference in an other terminal with less resources:
 
     $ export CUDA_VISIBLE_DEVICES=0
     $ export CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=512M
-    $ ./tensorflow_lstm_ctc_decode.py test.wav
+    $ ./decode.py test.wav

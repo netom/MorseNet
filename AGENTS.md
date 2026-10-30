@@ -25,20 +25,20 @@ executed.
 
 ```bash
 # Train (saves checkpoints to model_train/ and TensorBoard logs to logs/):
-./tensorflow_lstm_ctc_train.py
+./train.py
 
 # Monitor training:
 tensorboard --logdir=logs
 
 # Decode a WAV file (loads from model_train/):
-./tensorflow_lstm_ctc_decode.py test.wav
-./tensorflow_lstm_ctc_decode.py test.wav --greedy   # currently has no effect
+./decode.py test.wav
+./decode.py test.wav --greedy   # currently has no effect
 
-# Live microphone decoding (loads from model_use/):
-./tensorflow_lstm_ctc_live.py
+# Live microphone decoding (loads from CHECKPOINT_DIR unless --checkpoint-dir is given):
+./decode_live.py
 
 # Generate synthetic WAV samples:
-./generate_wav_samples.py <output_dir> <count> [--length SECONDS]
+./generate_samples.py <output_dir> <count> [--length SECONDS]
 ```
 
 There are no automated tests.
@@ -48,7 +48,7 @@ There are no automated tests.
 Shared configuration values are defined in **`config.py`**. Scripts import the
 values they use; most model and training scripts use `from config import *`.
 
-### Data pipeline (`generate_wav_samples.py`)
+### Data pipeline (`generate_samples.py`)
 - Generates synthetic CW audio on-the-fly: a sine tone (500–700 Hz) with timing
 jitter, white noise, impulse noise, QSB fading, and bandpass filtering.
 - Timing constants: `CHUNK=256` samples/step, `FRAMERATE=8000` Hz →
@@ -66,7 +66,7 @@ to time-major input and rotates the class axis so the blank class is last, as
 required by TensorFlow's beam-search decoder.
 - The CTC **blank index is `0`** (`MORSE_CHR[0]` is the `\0` sentinel).
 
-### Training (`tensorflow_lstm_ctc_train.py`)
+### Training (`train.py`)
 - `CTCTrainer` uses a manual `tf.GradientTape` loop — not `model.fit()`.
 - Dense and LSTM kernels have L2 regularizers configured with
 `L2_LAMBDA`; `train_step` currently optimizes CTC loss only.
@@ -77,14 +77,14 @@ required by TensorFlow's beam-search decoder.
 `ctc_decode()` with beam width 1 during training for speed.
 
 ### Inference
-- **`tensorflow_lstm_ctc_decode.py`**: loads the latest checkpoint from
+- **`decode.py`**: loads the latest checkpoint from
 `model_train/`, preprocesses WAV audio (reshape to `(timesteps, CHUNK)`,
 normalize), and runs beam search (width=100) by default. The `--greedy` flag
 currently does not change the decoding algorithm.
-- **`tensorflow_lstm_ctc_live.py`**: uses PyAudio to capture a rolling
-12-second audio buffer from `DEVICE` (configurable in `config.py`), and loads
-from `model_use/`. Its current decode call passes an unsupported argument to
-`ctc_decode()`, so live decoding fails when it first attempts to decode.
+- **`decode_live.py`**: uses PyAudio to capture live audio from `DEVICE`
+(configurable in `config.py`) and decodes it greedily in a streaming fashion,
+retaining LSTM and CTC state between blocks. It loads from `CHECKPOINT_DIR`
+by default (`--checkpoint-dir` overrides it).
 
 ## Key Conventions
 
@@ -99,5 +99,5 @@ and the CTC blank index (`0`) depend on the list order in `config.py`. Do not
 reorder it.
 - Audio input shape into the model: `[batch, TIMESTEPS, CHUNK]` (batch-major,
 not time-major).
-- The `generate_wav_samples.py` module is dual-purpose: importable library
+- The `generate_samples.py` module is dual-purpose: importable library
 (`seq_generator`, `generate_seq`) and a standalone CLI tool.

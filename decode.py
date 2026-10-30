@@ -123,7 +123,7 @@ def main(args):
         args: Command line arguments
     """
     if len(args) < 2:
-        print("Usage: ./tensorflow_lstm_ctc_decode.py <filename.wav> [--greedy]")
+        print("Usage: ./decode.py <filename.wav> [--greedy]")
         print("\nOptions:")
         print("  --greedy: Use beam search with width=1, a.k.a. greedy decoding (faster but less accurate)")
         print("            Default: use beam search with width=100")
@@ -165,7 +165,7 @@ def main(args):
     if model is None:
         print("\nError: Could not load model")
         print("\nTo decode audio:")
-        print("1. Train a model: ./tensorflow_lstm_ctc_train.py")
+        print("1. Train a model: ./train.py")
         print("2. Copy checkpoint from model_train/ to model_use/:")
         print("   - checkpoint file")
         print("   - ckpt-N.index")
