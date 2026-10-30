@@ -6,7 +6,7 @@ from config import *
 # TODO: dropout
 def create_cw_model(
     input_widths=[64],
-    recurrent_widths=[256],
+    recurrent_widths=[128],
     output_widths=[NUM_CLASSES],
 ):
     layers = []
