@@ -5,7 +5,7 @@
 MorseNet is a TensorFlow 2.x research project for decoding Morse code from raw
 audio using LSTM neural networks and CTC (Connectionist Temporal
 Classification) loss. Training data is synthetic, generated ahead of time into
-`samples/` and loaded from there.
+`dataset/` and loaded from there.
 
 ## Setup
 
@@ -25,15 +25,15 @@ executed.
 ## Running the Scripts
 
 ```bash
-# Train (saves checkpoints to model_train/ and TensorBoard logs to logs/):
+# Train (saves checkpoints to model/ and TensorBoard logs to logs/):
 ./train.py
 
 # Monitor training:
 tensorboard --logdir=logs
 
-# Decode a WAV file (loads from model_train/):
+# Decode a WAV file (loads from model/):
 ./decode.py test.wav
-./decode.py test.wav --greedy   # currently has no effect
+./decode.py test.wav --greedy
 
 # Live microphone decoding (loads from CHECKPOINT_DIR unless --checkpoint-dir is given):
 ./decode_live.py
@@ -72,16 +72,16 @@ required by TensorFlow's beam-search decoder.
 - Dense and LSTM kernels have L2 regularizers configured with
 `L2_LAMBDA`; `train_step` currently optimizes CTC loss only.
 - `train_step` does not clip gradients.
-- Checkpoints saved every 5 epochs to `model_train/` via
+- Checkpoints saved every 5 epochs to `model/` via
 `tf.train.CheckpointManager`.
 - LER (Label Error Rate) is computed with `tf.edit_distance` using
 `ctc_decode()` with beam width 1 during training for speed.
 
 ### Inference
 - **`decode.py`**: loads the latest checkpoint from
-`model_train/`, preprocesses WAV audio (reshape to `(timesteps, CHUNK)`,
-normalize), and runs beam search (width=100) by default. The `--greedy` flag
-currently does not change the decoding algorithm.
+`model/`, preprocesses WAV audio (reshape to `(timesteps, CHUNK)`,
+normalize), and runs beam search (width=100) by default. `--greedy` uses beam
+width 1.
 - **`decode_live.py`**: uses PyAudio to capture live audio from `DEVICE`
 (configurable in `config.py`) and decodes it greedily in a streaming fashion,
 retaining LSTM and CTC state between blocks. It loads from `CHECKPOINT_DIR`
@@ -91,7 +91,7 @@ by default (`--checkpoint-dir` overrides it).
 
 - **All tunable parameters live in `config.py`**. Never hardcode values that
 belong there (framerate, chunk size, character set, batch size, paths, etc.).
-- **Model checkpoint directories**: `model_train/` is the active training
+- **Model checkpoint directories**: `model/` is the active training
 directory; `model_use/` is the deployment directory. Promote checkpoints
 manually by copying the `checkpoint`, `ckpt-N.index`, and `ckpt-N.data-*`
 files.

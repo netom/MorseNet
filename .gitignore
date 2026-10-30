@@ -1,6 +1,7 @@
 /.venv
 /logs
-model_*
+/dataset*
+/model*
 __pycache__
 *.pkl
 *.pyc

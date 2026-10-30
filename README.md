@@ -31,7 +31,7 @@ For command line usage, issue:
 
     $ ./generate_samples.py --help
 
-For example, to generate samples numbered 0 to 999 in `./samples`:
+For example, to generate samples numbered 0 to 999 in `./dataset`:
 
     $ ./generate_samples.py 1000
 
@@ -41,21 +41,21 @@ To add samples numbered 1000 to 1999 to an existing corpus:
 
 The tool writes `.wav` audio, `.npy` audio, and `.txt` transcripts to the
 output directory (`--dirname`, default: `TRAINING_DATA_DIR` from `config.py`,
-i.e. `./samples`). Existing files with the same indices are overwritten. Use
+i.e. `./dataset`). Existing files with the same indices are overwritten. Use
 `--length SECONDS` to set the sample duration. Training reads matching `.npy`
 audio and `.txt` transcript files from `TRAINING_DATA_DIR`.
 
 ## train.py
 
 Builds and trains an LSTM neural network with CTC loss on chunked raw audio.
-Model checkpoints are saved to `CHECKPOINT_DIR` (default: `./model_train`);
+Model checkpoints are saved to `CHECKPOINT_DIR` (default: `./model`);
 TensorBoard events are saved to `LOG_DIR` (default: `./logs`).
 
 Usage:
 
     $ ./train.py
 
-By default, training uses the saved samples in `./samples`. Generate a corpus
+By default, training uses the saved samples in `./dataset`. Generate a corpus
 before training if needed:
 
     $ ./generate_samples.py 1000
@@ -75,7 +75,7 @@ Training progress can be observed with:
 
     $ tensorboard --logdir=logs
 
-Checkpoints are saved in `model_train`. Restarting with the same
+Checkpoints are saved in `model`. Restarting with the same
 `CHECKPOINT_DIR` and `LOG_DIR` resumes the epoch counter and continues the
 TensorBoard charts. An interrupted, incomplete epoch is rerun from its
 beginning. For older checkpoints without an epoch counter, completed epochs are
@@ -83,7 +83,8 @@ estimated from saved batch steps using the current `NUM_BATCHES_PER_EPOCH`.
 
 ## decode.py
 
-Restores the latest checkpoint from `./model_train` and decodes a WAV file.
+Restores the latest checkpoint from `CHECKPOINT_DIR` (default: `./model`) and
+decodes a WAV file.
 Pass `--greedy` to use a beam width of 1 instead of the default 100.
 
     $ ./decode.py test.wav

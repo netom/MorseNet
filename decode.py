@@ -24,7 +24,7 @@ from config import *
 from model import create_cw_model, ctc_decode, decoded_to_text
 
 
-def load_model(checkpoint_dir='./model_train'):
+def load_model(checkpoint_dir=CHECKPOINT_DIR):
     """
     Load model from checkpoint directory.
 
@@ -160,16 +160,13 @@ def main(args):
 
     # Load model
     print("\nLoading model...")
-    model = load_model('./model_train')
+    model = load_model(CHECKPOINT_DIR)
 
     if model is None:
         print("\nError: Could not load model")
         print("\nTo decode audio:")
         print("1. Train a model: ./train.py")
-        print("2. Copy checkpoint from model_train/ to model_use/:")
-        print("   - checkpoint file")
-        print("   - ckpt-N.index")
-        print("   - ckpt-N.data-*")
+        print("2. Run this script again")
         sys.exit(1)
 
     # Decode

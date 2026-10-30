@@ -101,11 +101,11 @@ CHARS = {
 
 # Training configuration
 
-TRAINING_DATA_DIR = './samples'
+TRAINING_DATA_DIR = './dataset'
 BATCH_SIZE = 500
 NUM_BATCHES_PER_EPOCH = 100
 MAX_EPOCHS = 10000
-CHECKPOINT_DIR = './model_train'
+CHECKPOINT_DIR = './model'
 LOG_DIR = './logs'
 L2_LAMBDA = 0.0001
 GRADIENT_CLIP_NORM = 1.0
