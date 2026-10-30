@@ -20,13 +20,12 @@ set to a non-empty string:
 
     $ WITH_CUDA=y . venv.sh
 
-venv.sh also sets up LD_LIBRARY_PATH. Running the "deactivate" command will
-restore LD_LIBRARY_PATH.
+`venv.sh` also sets up `LD_LIBRARY_PATH`. Running `deactivate` restores its
+previous value.
 
 ## generate_samples.py
 
-It is both a command-line tool for debugging and a module for generating data
-for training/validation.
+This command-line tool generates synthetic training samples.
 
 For command line usage, issue:
 
@@ -43,15 +42,14 @@ To add samples numbered 1000 to 1999 to an existing corpus:
 The tool writes `.wav` audio, `.npy` audio, and `.txt` transcripts to the
 output directory (`--dirname`, default: `TRAINING_DATA_DIR` from `config.py`,
 i.e. `./samples`). Existing files with the same indices are overwritten. Use
-`--length SECONDS` to set the approximate sample length.
-Training reads matching `.npy` audio and `.txt` transcript files from
-`TRAINING_DATA_DIR`.
+`--length SECONDS` to set the sample duration. Training reads matching `.npy`
+audio and `.txt` transcript files from `TRAINING_DATA_DIR`.
 
 ## train.py
 
-Builds and trains a simple neural network with LSTM unit(s) using CTC as the
-loss function. The input is chunked raw audio. The model checkpoints and
-training / evaluation events are saved in a directory called "model_train".
+Builds and trains an LSTM neural network with CTC loss on chunked raw audio.
+Model checkpoints are saved to `CHECKPOINT_DIR` (default: `./model_train`);
+TensorBoard events are saved to `LOG_DIR` (default: `./logs`).
 
 Usage:
 
@@ -62,9 +60,13 @@ before training if needed:
 
     $ ./generate_samples.py 1000
 
-Set `TRAINING_DATA_DIR` in `config.py` to use another directory. The loader
-requires each `.npy` audio file to have the configured sample length and a
-`.txt` transcript with the same filename stem. The dataset is shuffled and
+Set `TRAINING_DATA_DIR` in `config.py` to use another directory. Samples are
+parsed and batched by a `tf.data` pipeline with parallel file reading. Each
+`.npy` audio file must contain exactly the configured sample length as float32
+(as written by `generate_samples.py`) and have a `.txt` transcript with the
+same filename stem. Invalid sample sizes or transcript characters stop training
+with an error identifying the audio file; missing transcripts are reported by
+TensorFlow when the corresponding file is read. The dataset is shuffled and
 repeated to provide `NUM_BATCHES_PER_EPOCH`, so a small corpus is reused within
 an epoch. `BATCH_SIZE` remains configurable, and the corpus does not need to be
 an exact multiple of it.
@@ -81,15 +83,14 @@ estimated from saved batch steps using the current `NUM_BATCHES_PER_EPOCH`.
 
 ## decode.py
 
-Restores the latest checkpoint from the directory "model_train", and decodes a
-wav file given it's name as it's sole argument.
+Restores the latest checkpoint from `./model_train` and decodes a WAV file.
+Pass `--greedy` to use a beam width of 1 instead of the default 100.
 
     $ ./decode.py test.wav
 
-The decoded text will appear under a pile of TF INFO messages.
-
-The script uses beam search with width 100 by default. Its `--greedy` option
-will reduce the beam width to 1, wich is equivalent to greedy decoding.
+The script may print TensorFlow informational messages before the decoded text.
+`--greedy` sets beam width to 1; decoding still uses TensorFlow's beam-search
+decoder.
 
 ## decode_live.py
 
@@ -109,25 +110,24 @@ defaults to 0.5 seconds to allow scheduling headroom for capture.
 `LIVE_NORMALIZATION_SECONDS` controls causal normalization adaptation. PyAudio
 must be installed.
 
-Existing model weights are reused. Streaming normalization differs from
-training's per-sample normalization, and long-lived LSTM state differs from
-training on independent samples, so this is an experimental alternative, not a
-guarantee of better recognition. Restarting the script resets its network and
-CTC state. Audio capture runs independently of inference, with a bounded queue
-controlled by `LIVE_STATEFUL_QUEUE_SECONDS`. If input overflows or that queue
-fills, decoding reports the loss and resets network, CTC, and preprocessing
-state rather than carrying state across a gap. Queued blocks are processed
-together to catch up after temporary delays. `LIVE_STATEFUL_CPU_THREADS`
-defaults to 1 to reduce CPU scheduling contention with audio capture. Loss
-warnings distinguish PortAudio input overflow from an application queue
-overflow; an additional warning indicates if inference takes longer than the
-audio it processes. Persistent PortAudio input overflow occurs before the
-application queue; increasing the queue alone cannot fix it. On Linux, try an
-available `pulse` or `default` input instead of a raw `hw:` device using
-`--list-devices` and `--device`. Capture block size and actual input latency
-are printed at startup to help diagnose device buffering.
+Streaming normalization differs from training's per-sample normalization, and
+long-lived LSTM state differs from training on independent samples, so this is
+experimental and is not guaranteed to improve recognition. Restarting the
+script resets its network and CTC state. Audio capture runs independently of
+inference, with a bounded queue controlled by `LIVE_STATEFUL_QUEUE_SECONDS`. If
+input overflows or that queue fills, decoding reports the loss and resets
+network, CTC, and preprocessing state rather than carrying state across a gap.
+Queued blocks are processed together to catch up after temporary delays.
+`LIVE_STATEFUL_CPU_THREADS` defaults to 1 to reduce CPU scheduling contention
+with audio capture. Loss warnings distinguish PortAudio input overflow from an
+application queue overflow; an additional warning indicates if inference takes
+longer than the audio it processes. Persistent PortAudio input overflow occurs
+before the application queue; increasing the queue alone cannot fix it. On
+Linux, try an available `pulse` or `default` input instead of a raw `hw:`
+device using `--list-devices` and `--device`. Capture block size and actual
+input latency are printed at startup to help diagnose device buffering.
 
-## Running with NVidia MPS
+## Running with NVIDIA MPS
 
 See: https://docs.nvidia.com/deploy/mps/latest/index.html
 
@@ -142,7 +142,7 @@ Set up the environment in another terminal:
     $ export CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=2G
     $ ./train.py
 
-You can safely run inference in an other terminal with less resources:
+Inference can also be run in another terminal with a smaller MPS memory limit:
 
     $ export CUDA_VISIBLE_DEVICES=0
     $ export CUDA_MPS_PINNED_DEVICE_MEM_LIMIT=0=512M

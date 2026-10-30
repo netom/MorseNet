@@ -10,9 +10,7 @@ for maximum control over the training process.
 
 from __future__ import generator_stop
 
-import numpy as np
 import pathlib
-import random
 import tensorflow as tf
 import time
 
@@ -189,89 +187,51 @@ class CTCTrainer:
             tf.summary.scalar('epoch_time', metrics['time'], step=epoch)
         self.train_writer.flush()
 
-def get_saved_samples(data_dir):
-    """Return matching audio/transcript paths from a saved sample directory."""
-    data_dir = pathlib.Path(data_dir)
-    if not data_dir.is_dir():
-        raise FileNotFoundError(f"Training data directory does not exist: {data_dir}")
-
-    audio_files = {path.stem: path for path in data_dir.glob('*.npy')}
-    transcript_files = {
-        path.stem: path for path in data_dir.glob('*.txt')
-        if path.name != 'config.txt'
-    }
-
-    missing_transcripts = sorted(audio_files.keys() - transcript_files.keys())
-    missing_audio = sorted(transcript_files.keys() - audio_files.keys())
-    if missing_transcripts or missing_audio:
-        details = []
-        if missing_transcripts:
-            details.append(f"missing transcripts for: {', '.join(missing_transcripts)}")
-        if missing_audio:
-            details.append(f"missing audio for: {', '.join(missing_audio)}")
-        raise ValueError(f"Incomplete training samples in {data_dir}: {'; '.join(details)}")
-
-    samples = [
-        (audio_files[stem], transcript_files[stem])
-        for stem in sorted(audio_files)
-    ]
-    if not samples:
-        raise ValueError(f"No .npy/.txt training sample pairs found in {data_dir}")
-
-    return samples
-
-def saved_sample_generator(samples):
-    """Shuffle and load saved samples continuously, one sample at a time."""
-    while True:
-        shuffled_samples = list(samples)
-        random.shuffle(shuffled_samples)
-
-        for audio_path, transcript_path in shuffled_samples:
-            audio = np.load(audio_path, allow_pickle=False)
-            if audio.shape != (SEQ_LENGTH_FRAMES,):
-                raise ValueError(
-                    f"Invalid audio shape in {audio_path}: expected "
-                    f"({SEQ_LENGTH_FRAMES},), got {audio.shape}"
-                )
-            audio = np.reshape(audio.astype(np.float32), (TIMESTEPS, CHUNK))
-
-            characters = transcript_path.read_text(encoding='utf-8').rstrip('\r\n')
-            unknown_characters = sorted(set(characters) - MORSE_ORD.keys())
-            if unknown_characters:
-                raise ValueError(
-                    f"Unknown transcript characters in {transcript_path}: "
-                    f"{', '.join(repr(character) for character in unknown_characters)}"
-                )
-            values = np.asarray([MORSE_ORD[character] for character in characters],
-                                dtype=np.int32)
-            indices = np.reshape(np.arange(len(values), dtype=np.int64), (-1, 1))
-            dense_shape = np.asarray([len(values)], dtype=np.int64)
-            yield audio, indices, values, dense_shape
+# Size of the header np.save writes in front of the data of a 1-D float32 array
+NPY_HEADER_BYTES = 128
 
 def create_dataset_from_saved_samples(data_dir, batch_size, num_batches):
-    """Create a shuffled, repeating dataset from saved audio/transcript pairs."""
-    samples = get_saved_samples(data_dir)
-    print(f"Found {len(samples)} saved training samples in {data_dir}")
+    """
+    Create a shuffled, repeating dataset from saved .npy audio / .txt
+    transcript.
+    """
+    char_table = tf.lookup.StaticHashTable(
+        tf.lookup.KeyValueTensorInitializer(
+            tf.constant(MORSE_CHR), tf.range(NUM_CLASSES, dtype=tf.int32)
+        ),
+        default_value=-1
+    )
+    audio_bytes = 4 * SEQ_LENGTH_FRAMES
 
-    dataset = tf.data.Dataset.from_generator(
-        lambda: saved_sample_generator(samples),
-        output_signature=(
-            tf.TensorSpec(shape=(TIMESTEPS, CHUNK), dtype=tf.float32),
-            tf.TensorSpec(shape=(None, 1), dtype=tf.int64),
-            tf.TensorSpec(shape=(None,), dtype=tf.int32),
-            tf.TensorSpec(shape=(1,), dtype=tf.int64)
+    def load_sample(audio_path):
+        raw = tf.io.read_file(audio_path)
+        tf.debugging.Assert(
+            tf.strings.length(raw) == NPY_HEADER_BYTES + audio_bytes,
+            ["Unexpected .npy size (expected float32 samples only):", audio_path]
         )
-    )
-    # Construct sparse labels in the dataset graph, not in the Python callback.
-    dataset = dataset.map(
-        lambda audio, indices, values, dense_shape: (
-            audio, tf.SparseTensor(indices, values, dense_shape)
+        audio = tf.io.decode_raw(
+            tf.strings.substr(raw, NPY_HEADER_BYTES, audio_bytes), tf.float32
         )
+        audio = tf.reshape(audio, (TIMESTEPS, CHUNK))
+
+        text = tf.io.read_file(tf.strings.regex_replace(audio_path, r'\.npy$', '.txt'))
+        text = tf.strings.regex_replace(text, r'[\r\n]+$', '')
+        labels = char_table.lookup(tf.strings.bytes_split(text))
+        tf.debugging.Assert(
+            tf.reduce_all(labels >= 0),
+            ["Unknown character in transcript of", audio_path]
+        )
+        return audio, labels
+
+    return (
+        tf.data.Dataset.list_files(f'{data_dir}/*.npy', shuffle=True)
+        .repeat()
+        .map(load_sample, num_parallel_calls=tf.data.AUTOTUNE, deterministic=False)
+        .ragged_batch(batch_size, drop_remainder=True)
+        .map(lambda audio, labels: (audio, labels.to_sparse()))
+        .take(num_batches)
+        .prefetch(tf.data.AUTOTUNE)
     )
-    dataset = dataset.batch(batch_size, drop_remainder=True)
-    dataset = dataset.take(num_batches)
-    dataset = dataset.prefetch(tf.data.AUTOTUNE)
-    return dataset
 
 def main():
     """Main training loop."""
