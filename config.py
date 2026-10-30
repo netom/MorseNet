@@ -102,7 +102,7 @@ CHARS = {
 # Training configuration
 
 TRAINING_DATA_DIR = './samples'
-BATCH_SIZE = 200
+BATCH_SIZE = 500
 NUM_BATCHES_PER_EPOCH = 100
 MAX_EPOCHS = 10000
 CHECKPOINT_DIR = './model_train'
