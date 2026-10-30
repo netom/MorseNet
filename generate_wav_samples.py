@@ -196,7 +196,8 @@ def generate_seq(seq_length, framerate=FRAMERATE):
     # Scale and convert to int
     #s = (s * 2**12).astype(np.int16)
 
-    return s, ''.join(characters)
+    # All DSP above runs in float64; emit float32 (the training precision)
+    return s.astype(np.float32), ''.join(characters)
 
 # List of worker processes or threads
 workers = []
@@ -209,7 +210,6 @@ def dowork():
     while True:
         audio, characters = generate_seq(SEQ_LENGTH_FRAMES, FRAMERATE)
 
-        audio = audio.astype(np.float32)
         audio = np.reshape(audio,  (SEQ_LENGTH_FRAMES // CHUNK, CHUNK))
 
         indices = np.asarray(range(len(characters)), dtype=np.int64)
