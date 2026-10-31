@@ -20,7 +20,7 @@ def build_model(
             activation='tanh',
             name=f'input_{i}'
         ))
-        # TODO: dropout
+        layers.append(tf.keras.layers.Dropout(0.1, name=f'input_dropout_{i}'))
 
     for i, width in enumerate(recurrent_widths):
         layers.append(tf.keras.layers.LSTM(
@@ -30,13 +30,14 @@ def build_model(
             recurrent_activation='sigmoid',
             use_bias=True,
             kernel_regularizer = tf.keras.regularizers.L2(L2_LAMBDA),
-            dropout=0.0,
+            dropout=0.1,
             recurrent_dropout=0.0,
             name=f'lstm_{i}'
         ))
         layers.append(tf.keras.layers.LayerNormalization())
 
     for i, width in enumerate(output_widths):
+        layers.append(tf.keras.layers.Dropout(0.2, name=f'output_dropout_{i}'))
         layers.append(tf.keras.layers.Dense(
             width,
             activation=None,
