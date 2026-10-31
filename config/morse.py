@@ -1,34 +1,3 @@
-# Sound device used to play samples
-DEVICE = 0
-
-# Live decoding
-LIVE_STATEFUL_BLOCK_SECONDS = 0.5
-LIVE_NORMALIZATION_SECONDS = 3.0
-LIVE_STATEFUL_QUEUE_SECONDS = 2.0
-LIVE_STATEFUL_CPU_THREADS = 1
-
-# Used audio sampling rate
-FRAMERATE = 8000
-
-# The size of the FFT (no FFT used yet)
-FFT_SIZE = 128 # 62.5Hz wide bins
-
-# Size of buffer processed by the neural network in a single step
-CHUNK = 256
-
-# The size of a sample in chunks
-SEQ_LENGTH_SECONDS = 12
-SEQ_LENGTH_FRAMES = (FRAMERATE * SEQ_LENGTH_SECONDS) // CHUNK * CHUNK
-TIMESTEPS = SEQ_LENGTH_FRAMES // CHUNK
-
-# Code speed and max length
-#
-# Sequence max length can be much shorter than the theoretical
-# maximum, as having a fast all-E sequence is very, very unlikely.
-WPM_MIN = 10.0
-WPM_MAX = 40.0
-SEQ_MAX_CHARS=50
-
 # The character set in canonical order
 MORSE_CHR = [
     '\0',
@@ -98,16 +67,3 @@ CHARS = {
     '+': '.-.-.',
     ' ': None,
 }
-
-# Training configuration
-
-TRAINING_DATA_DIR = './dataset/train'
-TEST_DATA_DIR = './dataset/test'
-BATCH_SIZE = 500
-NUM_BATCHES_PER_EPOCH = 100
-MAX_EPOCHS = 10000
-CHECKPOINT_DIR = './model'
-LOG_DIR = './logs'
-L2_LAMBDA = 0.0001
-GRADIENT_CLIP_NORM = 1.0
-CHECKPOINTS_TO_KEEP = 1000

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 import tensorflow as tf
-from config import *
 
-# TODO: dropout
-def create_cw_model(
+from config.audio import *
+from config.morse import *
+from config.train import *
+
+def build_model(
     input_widths=[],
     recurrent_widths=[128,128],
     output_widths=[NUM_CLASSES],
@@ -18,6 +20,7 @@ def create_cw_model(
             activation='tanh',
             name=f'input_{i}'
         ))
+        # TODO: dropout
 
     for i, width in enumerate(recurrent_widths):
         layers.append(tf.keras.layers.LSTM(

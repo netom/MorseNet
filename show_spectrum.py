@@ -13,7 +13,7 @@ import scipy.fft
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from config import FRAMERATE, CHUNK
+from config.audio import *
 
 def fft_spectrogram(audio: np.ndarray, frame_size: int, hop_size: int) -> np.ndarray:
     """

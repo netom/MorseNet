@@ -47,8 +47,9 @@ There are no automated tests.
 
 ## Architecture
 
-Shared configuration values are defined in **`config.py`**. Scripts import the
-values they use; most model and training scripts use `from config import *`.
+Shared configuration values are defined in **`config/`**: `audio.py`,
+`dataset.py`, `live.py`, `morse.py`, and `train.py`. Scripts import the
+values they use with `from config.<module> import *`.
 
 ### Data pipeline (`dataset.py`)
 - Generates synthetic CW audio: a sine tone (500–700 Hz) with timing
@@ -63,7 +64,7 @@ generating samples.
 - Normalization `(x - mean) / std` is applied per-sample before the model.
 
 ### Model (`model.py`)
-- `create_cw_model()` returns a `tf.keras.Sequential`: configurable dense input
+- `build_model()` returns a `tf.keras.Sequential`: configurable dense input
 layers → stacked LSTM+LayerNormalization pairs → dense output layers.
 - `ctc_decode()` wraps `tf.nn.ctc_beam_search_decoder`. It transposes logits
 to time-major input and rotates the class axis so the blank class is last, as
@@ -89,20 +90,20 @@ required by TensorFlow's beam-search decoder.
 normalize), and runs beam search (width=100) by default. `--greedy` uses beam
 width 1.
 - **`decode_live.py`**: uses PyAudio to capture live audio from `DEVICE`
-(configurable in `config.py`) and decodes it greedily in a streaming fashion,
+(configurable in `config/live.py`) and decodes it greedily in a streaming fashion,
 retaining LSTM and CTC state between blocks. It loads from `CHECKPOINT_DIR`
 by default (`--checkpoint-dir` overrides it).
 
 ## Key Conventions
 
-- **All tunable parameters live in `config.py`**. Never hardcode values that
+- **All tunable parameters live in `config/`**. Never hardcode values that
 belong there (framerate, chunk size, character set, batch size, paths, etc.).
 - **Model checkpoint directories**: `model/` is the active training
 directory; `model_use/` is the deployment directory. Promote checkpoints
 manually by copying the `checkpoint`, `ckpt-N.index`, and `ckpt-N.data-*`
 files.
 - **`MORSE_CHR` order is canonical**: character-to-index mapping (`MORSE_ORD`)
-and the CTC blank index (`0`) depend on the list order in `config.py`. Do not
+and the CTC blank index (`0`) depend on the list order in `config/morse.py`. Do not
 reorder it.
 - Audio input shape into the model: `[batch, TIMESTEPS, CHUNK]` (batch-major,
 not time-major).

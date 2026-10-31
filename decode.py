@@ -6,23 +6,17 @@ Inference script for morse code decoder using TensorFlow 2.x.
 This script loads a trained model and decodes morse code from WAV audio files.
 """
 
-from __future__ import generator_stop
-
 import tensorflow as tf
 import numpy as np
 import scipy.io.wavfile
 import sys
 from pathlib import Path
 
-# Suppress TensorFlow warnings
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+from model import build_model, ctc_decode, decoded_to_text
 
-from config import *
-from model import create_cw_model, ctc_decode, decoded_to_text
-
+from config.audio import *
+from config.morse import *
+from config.train import *
 
 def load_model(checkpoint_dir=CHECKPOINT_DIR):
     """
@@ -35,7 +29,7 @@ def load_model(checkpoint_dir=CHECKPOINT_DIR):
         Loaded Keras model, or None if loading fails
     """
     # Create model with variable timesteps for inference
-    model = create_cw_model()
+    model = build_model()
 
     # Find latest checkpoint
     checkpoint_dir = Path(checkpoint_dir)

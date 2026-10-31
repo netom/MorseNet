@@ -7,9 +7,10 @@ from pathlib import Path
 
 import tensorflow as tf
 
-from config import CHUNK, CHECKPOINT_DIR
-from model import create_cw_model
+from model import build_model
 
+from config.audio import *
+from config.train import *
 
 def main():
     parser = argparse.ArgumentParser(
@@ -35,7 +36,7 @@ def main():
         parser.error(f"No checkpoint found in {args.checkpoint_dir}")
 
     # Keep the exported signature flexible for audio sequences of varying lengths.
-    model = create_cw_model()
+    model = build_model()
     model(tf.keras.Input(shape=(None, CHUNK)))
 
     status = tf.train.Checkpoint(model=model).restore(checkpoint)

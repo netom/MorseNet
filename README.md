@@ -66,7 +66,7 @@ Generate data for both splits before training:
     $ ./dataset.py 1000 --split train
     $ ./dataset.py 200 --split test
 
-Set `TRAINING_DATA_DIR` and `TEST_DATA_DIR` in `config.py` to use other
+Set `TRAINING_DATA_DIR` and `TEST_DATA_DIR` in `config/train.py` to use other
 directories. Samples are parsed and batched by a `tf.data` pipeline with
 parallel file reading. Each `.npy` audio file must contain exactly the
 configured sample length as float32
@@ -113,7 +113,8 @@ hidden/cell state and the CTC previous-class state:
     $ python decode_live.py --list-devices
     $ python decode_live.py --device 3
 
-It defaults to `CHECKPOINT_DIR` and `DEVICE` in `config.py`, captures at the
+It defaults to `CHECKPOINT_DIR` in `config/train.py` and `DEVICE` in
+`config/live.py`, captures at the
 device's default rate, and uses streaming anti-aliasing resampling. It appends
 greedy CTC output immediately, without a 12-second buffer or confirmation
 delay. `LIVE_STATEFUL_BLOCK_SECONDS` controls capture block duration; it

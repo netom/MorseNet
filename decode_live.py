@@ -13,13 +13,12 @@ import numpy as np
 import tensorflow as tf
 from scipy.signal import resample_poly
 
-from config import (
-    CHECKPOINT_DIR, CHUNK, DEVICE, FRAMERATE, LIVE_NORMALIZATION_SECONDS,
-    LIVE_STATEFUL_BLOCK_SECONDS, LIVE_STATEFUL_QUEUE_SECONDS,
-    LIVE_STATEFUL_CPU_THREADS, MORSE_CHR,
-)
-from model import create_cw_model
+from model import build_model
 
+from config.audio import *
+from config.live import *
+from config.morse import *
+from config.train import *
 
 class StreamingResampler:
     """Polyphase resampling with aligned history and filter lookahead."""
@@ -236,7 +235,7 @@ def main():
     latest = tf.train.latest_checkpoint(args.checkpoint_dir)
     if latest is None:
         parser.exit(1, f"No checkpoint found in {args.checkpoint_dir}\n")
-    model = create_cw_model()
+    model = build_model()
     model(tf.zeros((1, 1, CHUNK)))
     status = tf.train.Checkpoint(model=model).restore(latest)
     status.expect_partial()

@@ -8,14 +8,15 @@ morse code from raw audio data. Uses custom training loop with gradient tape
 for maximum control over the training process.
 """
 
-from __future__ import generator_stop
-
 import pathlib
 import tensorflow as tf
 import time
 
-from config import *
-from model import create_cw_model, ctc_decode
+from model import build_model, ctc_decode
+
+from config.audio import *
+from config.morse import *
+from config.train import *
 
 class CTCTrainer:
     """Custom training class for CTC model with checkpoint management."""
@@ -342,7 +343,7 @@ def main():
     print(f"Log dir: {LOG_DIR}")
     print("")
 
-    model = create_cw_model()
+    model = build_model()
     model.summary()
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
     trainer = CTCTrainer(model, optimizer, CHECKPOINT_DIR, LOG_DIR)
