@@ -82,7 +82,7 @@ class CTCTrainer:
             label_length: Length of each label sequence [batch]
 
         Returns:
-            Tuple of (total_loss, ctc_loss, l2_loss, ler)
+            (loss, ler), returned loss does not include L2 regularization
         """
         with tf.GradientTape() as tape:
             logits = self.model(audio, training=True)
@@ -95,8 +95,9 @@ class CTCTrainer:
                 logits_time_major=False,
                 blank_index=0
             ))
+            total_loss = loss + tf.add_n(self.model.losses)
 
-        gradients = tape.gradient(loss, self.model.trainable_variables)
+        gradients = tape.gradient(total_loss, self.model.trainable_variables)
         self.optimizer.apply_gradients(
             zip(gradients, self.model.trainable_variables)
         )
