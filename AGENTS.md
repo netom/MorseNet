@@ -64,18 +64,33 @@ generating samples.
 - Normalization `(x - mean) / std` is applied per-sample before the model.
 
 ### Model (`model.py`)
-- `build_model()` returns a `tf.keras.Sequential`: configurable dense input
-layers → stacked LSTM+LayerNormalization pairs → dense output layers.
+- The architecture is declared in **`model.yaml`** (YAML anchors for reusable
+layer/regularizer templates; `$kind`/`$type` select the `tf.keras` class, other
+keys are constructor arguments, and `!var NAME` resolves a name from `model.py`'s
+globals, e.g. `NUM_CLASSES`). Currently: 3× (LSTM 128 + LayerNormalization) →
+Dropout 0.2 → Dense output.
+- `build_model()` loads `model.yaml`, builds the `tf.keras.Sequential`, and calls
+`model.build((None, TIMESTEPS, CHUNK))` so weights exist (needed for
+`summary()` and checkpoint restore).
+
+### CTC helpers (`ctc.py`)
 - `ctc_decode()` wraps `tf.nn.ctc_beam_search_decoder`. It transposes logits
 to time-major input and rotates the class axis so the blank class is last, as
 required by TensorFlow's beam-search decoder.
+- `decoded_to_text()` converts decoded sparse tensors to strings.
 - The CTC **blank index is `0`** (`MORSE_CHR[0]` is the `\0` sentinel).
 
 ### Training (`train.py`)
 - `CTCTrainer` uses a manual `tf.GradientTape` loop — not `model.fit()`.
-- Dense and LSTM kernels have L2 regularizers configured with
-`L2_LAMBDA`; `train_step` currently optimizes CTC loss only.
+- Dense and LSTM kernels have L2 regularizers (`l2` value set in `model.yaml`);
+`train_step` optimizes CTC loss plus the regularization losses
+(`model.losses`), while the returned/logged loss excludes regularization.
 - `train_step` does not clip gradients.
+- `train_step` and `test_step` use `tf.function(input_signature=STEP_SIGNATURE)`.
+Label batches are sparse tensors whose static shape differs per batch; without
+the fixed signature TensorFlow retraces every step (slow, starves the GPU).
+- On an 8 GB RTX 3070, `BATCH_SIZE=500` caused sporadic CUDA crashes late in
+training (Xid 13/43 illegal address); `BATCH_SIZE=400` has been stable.
 - Checkpoints saved every 5 epochs to `model/` via
 `tf.train.CheckpointManager`.
 - LER (Label Error Rate) is computed with `tf.edit_distance` using

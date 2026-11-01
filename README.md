@@ -56,6 +56,10 @@ Builds and trains an LSTM neural network with CTC loss on chunked raw audio.
 Model checkpoints are saved to `CHECKPOINT_DIR` (default: `./model`);
 TensorBoard events are saved to `LOG_DIR` (default: `./logs`).
 
+The network architecture (LSTM/LayerNormalization/Dense/Dropout layers and
+their sizes) is defined in `model.yaml` and loaded by `model.py`. CTC decoding
+helpers live in `ctc.py`.
+
 Usage:
 
     $ ./train.py
@@ -89,6 +93,10 @@ Checkpoints are saved in `model`. Restarting with the same
 TensorBoard charts. An interrupted, incomplete epoch is rerun from its
 beginning. For older checkpoints without an epoch counter, completed epochs are
 estimated from saved batch steps using the current `NUM_BATCHES_PER_EPOCH`.
+If training crashes with a CUDA error such as `Unexpected Event status: 1`
+(`dmesg` shows Xid 13/43), reduce `BATCH_SIZE` in `config/train.py`; 500 was
+unstable on an 8 GB GPU, 400 works. Checkpoints are saved every 5 epochs, so
+simply restart `./train.py` to resume.
 TensorBoard also records `test_loss` and `test_ler` for the held-out split.
 
 ## decode.py
