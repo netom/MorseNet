@@ -12,11 +12,21 @@ import pathlib
 import tensorflow as tf
 import time
 
-from model import build_model, ctc_decode
+from model import build_model
+from ctc import ctc_decode
 
 from config.audio import *
 from config.morse import *
 from config.train import *
+
+# Fixed train / test step signature: labels' static shape varies per batch
+# and would cause retracing.
+STEP_SIGNATURE = [
+    tf.TensorSpec([None, TIMESTEPS, CHUNK], tf.float32),
+    tf.SparseTensorSpec([None, None], tf.int32),
+    tf.TensorSpec([None], tf.int32),
+    tf.TensorSpec([None], tf.int32),
+]
 
 class CTCTrainer:
     """Custom training class for CTC model with checkpoint management."""
@@ -70,7 +80,7 @@ class CTCTrainer:
         else:
             print("Starting training from scratch")
 
-    @tf.function
+    @tf.function(input_signature=STEP_SIGNATURE)
     def train_step(self, audio, labels, input_length, label_length):
         """
         Single training step with automatic differentiation.
@@ -117,7 +127,7 @@ class CTCTrainer:
 
         return loss, ler
 
-    @tf.function
+    @tf.function(input_signature=STEP_SIGNATURE)
     def test_step(self, audio, labels, input_length, label_length):
         """Calculate CTC loss and LER without updating model weights."""
         logits = self.model(audio, training=False)

@@ -12,7 +12,8 @@ import scipy.io.wavfile
 import sys
 from pathlib import Path
 
-from model import build_model, ctc_decode, decoded_to_text
+from model import build_model
+from ctc import ctc_decode, decoded_to_text
 
 from config.audio import *
 from config.morse import *
