@@ -1,0 +1,71 @@
+---
+l2reg: &l2reg
+  $kind: regularizer
+  $type: L2
+  l2: 1.0e-4
+
+dropout: &dropout
+  $kind: layer
+  $type: Dropout
+  rate: 0.1
+
+layernorm: &layernorm
+  $kind: layer
+  $type: LayerNormalization
+
+dense: &dense
+  $kind: layer
+  $type: Dense
+  kernel_regularizer: *l2reg
+  activation: tanh
+
+lstm: &lstm
+  $kind: layer
+  $type: LSTM
+  return_sequences: true
+  activation: tanh
+  recurrent_activation: sigmoid
+  use_bias: true
+  kernel_regularizer: *l2reg
+  dropout: 0.1
+  recurrent_dropout: 0.0
+
+model:
+  $kind: keras
+  $type: Sequential
+  layers:
+
+  # Input layers
+  # 
+  # - <<: *dense
+  #   units: 64
+  #   name: input_0
+  # - <<: *dropout
+  #   name: input_dropout_0
+
+  # Recurrent layers
+
+  - <<: *lstm
+    units: 96
+    name: lstm_0
+  - *layernorm
+
+  - <<: *lstm
+    units: 96
+    name: lstm_1
+  - *layernorm
+
+  - <<: *lstm
+    units: 96
+    name: lstm_2
+  - *layernorm
+
+  # Output layers
+
+  - <<: *dropout
+    rate: 0.2
+    name: output_dropout_0
+  - <<: *dense
+    units: !var NUM_CLASSES
+    activation: null
+    name: output_0
